@@ -21,6 +21,10 @@ test('una para cocina y otra para el cliente (Sabroso)', () => {
   assert.deepEqual(r.faltaPorElegir({ modo: 'por_ticket', impresoras: { cocina: 'X' } }), ['cliente']);
 });
 
+test('se abre sola al encender, siempre', () => {
+  assert.equal(r.ajustesValidos({ arrancarConWindows: false }).arrancarConWindows, true);
+});
+
 test('nada raro: modos y destinos desconocidos', () => {
   assert.equal(r.ajustesValidos({ modo: 'tres' }).modo, 'una');
   assert.equal(r.impresoraPara({}, 'cajon'), null);

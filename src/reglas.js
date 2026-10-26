@@ -24,7 +24,9 @@ function ajustesValidos(guardados) {
   return {
     modo: MODOS.includes(g.modo) ? g.modo : 'una',
     impresoras: { todo: texto(imp.todo), cocina: texto(imp.cocina), cliente: texto(imp.cliente) },
-    arrancarConWindows: g.arrancarConWindows !== false,
+    // Siempre (26/10/2026, Sandra: «que se abra automáticamente para todos»):
+    // así nunca se queda un pedido sin imprimir porque nadie la abrió.
+    arrancarConWindows: true,
   };
 }
 

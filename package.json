@@ -1,7 +1,7 @@
 {
   "name": "comandi-escritorio",
   "productName": "Comandi",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Comandi para el ordenador del restaurante: el tablero de pedidos con sus impresoras.",
   "main": "src/main.js",
   "author": "SCD TECH SL",
