@@ -72,4 +72,10 @@ function tituloCon(pendientes) {
   return n > 0 ? '(' + n + ') Comandi' : 'Comandi';
 }
 
-module.exports = { MODOS, DESTINOS, PORTADA, ajustesValidos, tandas, impresoraPara, faltaPorElegir, esDeComandi, tituloCon };
+// Una versión nueva ya bajada se instala de madrugada (de 4:00 a 4:59, hora
+// del ordenador): ningún restaurante está sirviendo a esa hora.
+function esHoraDeActualizar(fecha) {
+  return fecha instanceof Date && fecha.getHours() === 4;
+}
+
+module.exports = { MODOS, DESTINOS, PORTADA, ajustesValidos, tandas, impresoraPara, faltaPorElegir, esDeComandi, tituloCon, esHoraDeActualizar };

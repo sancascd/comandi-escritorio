@@ -15,6 +15,7 @@ const { app, BrowserWindow, ipcMain, shell, dialog, Menu, powerSaveBlocker } = r
 const path = require('path');
 const fs = require('fs');
 const reglas = require('./reglas');
+const { autoUpdater } = require('electron-updater');
 
 let ventana = null;
 let ventanaAjustes = null;
@@ -193,6 +194,28 @@ ipcMain.handle('ajustes:probar', async (evento, impresora, rotulo) => {
   return r;
 });
 
+// ---------- Actualizarse sola (26/10/2026) ----------
+// Las versiones nuevas están en GitHub (sancascd/comandi-escritorio, público):
+// se bajan solas y se instalan al cerrar la aplicación o, como en una cocina
+// no se cierra nunca, de madrugada (a las 4), cuando no hay pedidos.
+let actualizacionLista = false;
+function actualizaciones() {
+  if (!app.isPackaged) return;
+  autoUpdater.autoDownload = true;
+  autoUpdater.autoInstallOnAppQuit = true;
+  autoUpdater.on('update-downloaded', () => { actualizacionLista = true; });
+  autoUpdater.on('error', (e) => console.log('[actualizar]', e && e.message));
+  const mirar = () => autoUpdater.checkForUpdates().catch((e) => console.log('[actualizar]', e && e.message));
+  mirar();
+  setInterval(mirar, 6 * 60 * 60 * 1000);
+  setInterval(() => {
+    if (actualizacionLista && reglas.esHoraDeActualizar(new Date())) {
+      saliendo = true;
+      autoUpdater.quitAndInstall(true, true);
+    }
+  }, 10 * 60 * 1000);
+}
+
 // ---------- Arranque ----------
 if (!app.requestSingleInstanceLock()) {
   app.quit();
@@ -206,6 +229,7 @@ if (!app.requestSingleInstanceLock()) {
     // Que el ordenador no se duerma con Comandi abierta.
     powerSaveBlocker.start('prevent-app-suspension');
     crearVentana();
+    actualizaciones();
     // La primera vez, directo a elegir impresoras.
     if (!fs.existsSync(rutaAjustes())) abrirAjustes();
   });

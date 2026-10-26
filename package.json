@@ -1,7 +1,7 @@
 {
   "name": "comandi-escritorio",
   "productName": "Comandi",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Comandi para el ordenador del restaurante: el tablero de pedidos con sus impresoras.",
   "main": "src/main.js",
   "author": "SCD TECH SL",
@@ -24,18 +24,35 @@
     },
     "win": {
       "target": "nsis",
-      "icon": "build/icon.png"
+      "icon": "build/icon.png",
+      "artifactName": "Comandi-Setup.${ext}"
     },
     "nsis": {
       "oneClick": true,
       "perMachine": false,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "Comandi"
-    }
+      "shortcutName": "Comandi",
+      "artifactName": "Comandi-Setup.${ext}"
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "sancascd",
+        "repo": "comandi-escritorio",
+        "releaseType": "release"
+      }
+    ]
   },
   "devDependencies": {
     "electron": "^33.2.1",
     "electron-builder": "^25.1.8"
+  },
+  "dependencies": {
+    "electron-updater": "^6.3.9"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sancascd/comandi-escritorio.git"
   }
 }

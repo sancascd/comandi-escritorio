@@ -43,3 +43,8 @@ test('el título lleva los pedidos sin atender', () => {
   assert.equal(r.tituloCon(0), 'Comandi');
   assert.equal(r.tituloCon(3), '(3) Comandi');
 });
+
+test('se actualiza de madrugada, a las 4', () => {
+  assert.equal(r.esHoraDeActualizar(new Date(2026, 9, 27, 4, 30)), true);
+  assert.equal(r.esHoraDeActualizar(new Date(2026, 9, 27, 14, 0)), false);
+});
