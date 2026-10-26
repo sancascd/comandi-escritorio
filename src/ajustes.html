@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'">
+<title>Impresoras y ajustes · Comandi</title>
+<style>
+  :root { --verde: #10B981; --verde-oscuro: #059669; --texto: #18181b; --gris: #71717a; --borde: #e4e4e7; --fondo: #f6faf8; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--fondo); color: var(--texto); font: 14px/1.45 "Segoe UI", system-ui, sans-serif; padding: 20px; }
+  h1 { font-size: 18px; margin: 0 0 4px; }
+  p.sub { margin: 0 0 18px; color: var(--gris); }
+  .bloque { background: #fff; border: 1px solid var(--borde); border-radius: 12px; padding: 14px; margin-bottom: 14px; }
+  .bloque h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--gris); margin: 0 0 10px; }
+  label.opcion { display: flex; gap: 10px; align-items: flex-start; padding: 8px; border-radius: 8px; cursor: pointer; }
+  label.opcion:hover { background: var(--fondo); }
+  label.opcion small { display: block; color: var(--gris); }
+  .fila { display: grid; grid-template-columns: 130px 1fr auto; gap: 8px; align-items: center; margin-top: 8px; }
+  select { width: 100%; padding: 7px 8px; border: 1px solid var(--borde); border-radius: 8px; font: inherit; background: #fff; }
+  button { font: inherit; border-radius: 999px; border: 1px solid var(--borde); background: #fff; padding: 7px 12px; cursor: pointer; }
+  button.principal { background: var(--verde); border-color: var(--verde); color: #fff; font-weight: 600; padding: 10px 20px; }
+  button.principal:hover { background: var(--verde-oscuro); }
+  button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px solid var(--verde); outline-offset: 2px; }
+  .oculto { display: none; }
+  #estado { min-height: 20px; margin: 8px 0 0; font-weight: 600; }
+  #estado.mal { color: #b91c1c; } #estado.bien { color: var(--verde-oscuro); }
+  .pie { display: flex; justify-content: flex-end; gap: 8px; }
+</style>
+</head>
+<body>
+  <h1>Impresoras y ajustes</h1>
+  <p class="sub">Se guardan en este ordenador. Cada ordenador elige las suyas.</p>
+
+  <div class="bloque">
+    <h2>Cómo imprimes</h2>
+    <label class="opcion"><input type="radio" name="modo" value="una" id="modo-una">
+      <span>Una impresora para todo<small>Todos los tickets salen por la misma.</small></span></label>
+    <label class="opcion"><input type="radio" name="modo" value="por_ticket" id="modo-por-ticket">
+      <span>Una para cocina y otra para el cliente<small>El ticket de cocina por una y el del cliente (el de la bolsa) por otra.</small></span></label>
+
+    <div id="una">
+      <div class="fila">
+        <label for="imp-todo">Impresora</label>
+        <select id="imp-todo"></select>
+        <button type="button" data-probar="imp-todo" data-rotulo="Todos los tickets">Probar</button>
+      </div>
+    </div>
+    <div id="dos" class="oculto">
+      <div class="fila">
+        <label for="imp-cocina">Ticket de cocina</label>
+        <select id="imp-cocina"></select>
+        <button type="button" data-probar="imp-cocina" data-rotulo="Ticket de cocina">Probar</button>
+      </div>
+      <div class="fila">
+        <label for="imp-cliente">Ticket del cliente</label>
+        <select id="imp-cliente"></select>
+        <button type="button" data-probar="imp-cliente" data-rotulo="Ticket del cliente">Probar</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="bloque">
+    <h2>Al encender el ordenador</h2>
+    <label class="opcion"><input type="checkbox" id="arranque">
+      <span>Abrir Comandi solo<small>Así nunca se queda un pedido sin imprimir porque nadie la abrió.</small></span></label>
+  </div>
+
+  <p id="estado" role="status"></p>
+  <div class="pie">
+    <button type="button" class="principal" id="guardar">Guardar</button>
+  </div>
+<script src="ajustes-ventana.js"></script>
+</body>
+</html>
