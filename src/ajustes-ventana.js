@@ -30,6 +30,8 @@
   $('imp-todo').value = guardados.impresoras.todo || '';
   $('imp-cocina').value = guardados.impresoras.cocina || '';
   $('imp-cliente').value = guardados.impresoras.cliente || '';
+  $('papel').value = String(guardados.papel || 80);
+  $('papel-justo').checked = guardados.papelJusto !== false;
   pintarModo();
   document.querySelectorAll('input[name="modo"]').forEach((r) => r.addEventListener('change', pintarModo));
 
@@ -52,6 +54,8 @@
     await window.ajustes.guardar({
       modo,
       impresoras: { todo: $('imp-todo').value, cocina: $('imp-cocina').value, cliente: $('imp-cliente').value },
+      papel: Number($('papel').value),
+      papelJusto: $('papel-justo').checked,
     });
     estado('Guardado. Ya puedes cerrar esta ventana.', 'bien');
   });

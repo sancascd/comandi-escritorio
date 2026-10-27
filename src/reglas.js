@@ -10,6 +10,8 @@
 
 const MODOS = ['una', 'por_ticket'];
 const DESTINOS = ['todo', 'cocina', 'cliente'];
+// El ancho del rollo de las impresoras de tickets, en milímetros.
+const PAPELES = [80, 58];
 
 const PORTADA = 'https://comandi.es/pedidos';
 
@@ -27,7 +29,33 @@ function ajustesValidos(guardados) {
     // Siempre (26/10/2026, Sandra: «que se abra automáticamente para todos»):
     // así nunca se queda un pedido sin imprimir porque nadie la abrió.
     arrancarConWindows: true,
+    // El papel a la medida (28/10/2026): cada ticket en su papel, cortado al
+    // acabar. Encendido salvo que se apague; el rollo, de 80 mm si no se dice.
+    papel: PAPELES.includes(Number(g.papel)) ? Number(g.papel) : 80,
+    papelJusto: g.papelJusto !== false,
   };
+}
+
+// EL PAPEL A LA MEDIDA (28/10/2026). Se mide un poco más estrecho que el rollo
+// (3 mm de margen a cada lado): así nunca se queda corto y parte un ticket.
+const PX_POR_MM = 96 / 25.4;
+const MARGEN_MM = 8;      // 3 + 3 de margen y 2 de holgura
+const ALTO_MIN_MM = 30;
+const ALTO_MAX_MM = 3000; // tres metros: más que eso es un error
+
+function anchoParaMedir(papelMm) {
+  const p = PAPELES.includes(Number(papelMm)) ? Number(papelMm) : 80;
+  return p - 6;
+}
+
+// El tamaño del papel para un ticket de `altoPx` píxeles: { width, height } en
+// micras, como lo pide Electron. null si el alto no vale.
+function tamanoDelPapel(papelMm, altoPx) {
+  const alto = Number(altoPx);
+  if (!isFinite(alto) || alto <= 0) return null;
+  const p = PAPELES.includes(Number(papelMm)) ? Number(papelMm) : 80;
+  const mm = Math.min(ALTO_MAX_MM, Math.max(ALTO_MIN_MM, Math.ceil(alto / PX_POR_MM + MARGEN_MM)));
+  return { width: p * 1000, height: mm * 1000 };
 }
 
 // Las tandas de una impresión: en qué «puestos» pinta el tablero los tickets
@@ -78,4 +106,4 @@ function esHoraDeActualizar(fecha) {
   return fecha instanceof Date && fecha.getHours() === 4;
 }
 
-module.exports = { MODOS, DESTINOS, PORTADA, ajustesValidos, tandas, impresoraPara, faltaPorElegir, esDeComandi, tituloCon, esHoraDeActualizar };
+module.exports = { MODOS, DESTINOS, PAPELES, PORTADA, ajustesValidos, anchoParaMedir, tamanoDelPapel, tandas, impresoraPara, faltaPorElegir, esDeComandi, tituloCon, esHoraDeActualizar };

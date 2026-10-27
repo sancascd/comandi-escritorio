@@ -15,6 +15,7 @@ const { app, BrowserWindow, ipcMain, shell, dialog, Menu, powerSaveBlocker } = r
 const path = require('path');
 const fs = require('fs');
 const reglas = require('./reglas');
+const papel = require('./papel');
 const { autoUpdater } = require('electron-updater');
 
 let ventana = null;
@@ -46,10 +47,11 @@ function aplicarArranque(ajustes) {
 // ---------- Imprimir ----------
 // Imprime lo que esté pintando ahora la página (el tablero pinta los tickets
 // de esa tanda justo antes de pedirlo) en la impresora de esa tanda.
-function imprimirEn(webContents, deviceName) {
+function imprimirEn(webContents, deviceName, pageSize) {
   return new Promise((resolve) => {
     const opciones = { silent: true, printBackground: true, margins: { marginType: 'none' } };
     if (deviceName) opciones.deviceName = deviceName;
+    if (pageSize) opciones.pageSize = pageSize; // el papel a la medida (src/papel.js)
     webContents.print(opciones, (ok, motivo) => resolve({ ok, error: ok ? null : String(motivo || 'No se ha podido imprimir') }));
   });
 }
@@ -158,9 +160,11 @@ ipcMain.handle('comandi:tandas', (evento) => (desdeComandi(evento) ? reglas.tand
 ipcMain.handle('comandi:falta', (evento) => (desdeComandi(evento) ? reglas.faltaPorElegir(leerAjustes()) : []));
 ipcMain.handle('comandi:imprimir', async (evento, destino) => {
   if (!desdeComandi(evento)) return { ok: false, error: 'No permitido' };
-  const impresora = reglas.impresoraPara(leerAjustes(), destino);
+  const ajustes = leerAjustes();
+  const impresora = reglas.impresoraPara(ajustes, destino);
   if (impresora === null) return { ok: false, error: 'Esa tanda no tiene impresora' };
-  return imprimirEn(evento.sender, impresora);
+  if (!ajustes.papelJusto) return imprimirEn(evento.sender, impresora);
+  return papel.imprimirALaMedida(evento.sender, ajustes.papel, (tamano) => imprimirEn(evento.sender, impresora, tamano));
 });
 ipcMain.on('comandi:abrir-ajustes', (evento) => { if (desdeComandi(evento)) abrirAjustes(); });
 ipcMain.on('comandi:aviso', (evento, pendientes) => {
