@@ -12,6 +12,14 @@ const MODOS = ['una', 'por_ticket'];
 const DESTINOS = ['todo', 'cocina', 'cliente'];
 // El ancho del rollo de las impresoras de tickets, en milímetros.
 const PAPELES = [80, 58];
+// Lo que de verdad imprimen (06/11/2026, Servi-Loli: con la aplicación «se
+// cortan palabras»). Un rollo de 80 mm solo se imprime en 72 mm (576 puntos) y
+// uno de 58, en 48: si se le manda un papel de 80, lo de la derecha se pierde.
+// Chrome lo encogía solo; aquí el papel se manda ya de ese ancho.
+const IMPRIMIBLE = { 80: 72, 58: 48 };
+function rollo(papelMm) {
+  return PAPELES.includes(Number(papelMm)) ? Number(papelMm) : 80;
+}
 
 const PORTADA = 'https://comandi.es/pedidos';
 
@@ -36,16 +44,16 @@ function ajustesValidos(guardados) {
   };
 }
 
-// EL PAPEL A LA MEDIDA (28/10/2026). Se mide un poco más estrecho que el rollo
-// (3 mm de margen a cada lado): así nunca se queda corto y parte un ticket.
+// EL PAPEL A LA MEDIDA (28/10/2026). Se mide al ancho que imprime la
+// impresora, el mismo con el que luego se imprime (sin márgenes de página:
+// los pone la aplicación, 1,5 mm a cada lado; ver src/papel.js).
 const PX_POR_MM = 96 / 25.4;
-const MARGEN_MM = 8;      // 3 + 3 de margen y 2 de holgura
+const MARGEN_MM = 8;      // holgura al final, para no partir nunca un ticket
 const ALTO_MIN_MM = 30;
 const ALTO_MAX_MM = 3000; // tres metros: más que eso es un error
 
 function anchoParaMedir(papelMm) {
-  const p = PAPELES.includes(Number(papelMm)) ? Number(papelMm) : 80;
-  return p - 6;
+  return IMPRIMIBLE[rollo(papelMm)];
 }
 
 // El tamaño del papel para un ticket de `altoPx` píxeles: { width, height } en
@@ -53,9 +61,8 @@ function anchoParaMedir(papelMm) {
 function tamanoDelPapel(papelMm, altoPx) {
   const alto = Number(altoPx);
   if (!isFinite(alto) || alto <= 0) return null;
-  const p = PAPELES.includes(Number(papelMm)) ? Number(papelMm) : 80;
   const mm = Math.min(ALTO_MAX_MM, Math.max(ALTO_MIN_MM, Math.ceil(alto / PX_POR_MM + MARGEN_MM)));
-  return { width: p * 1000, height: mm * 1000 };
+  return { width: IMPRIMIBLE[rollo(papelMm)] * 1000, height: mm * 1000 };
 }
 
 // Las tandas de una impresión: en qué «puestos» pinta el tablero los tickets
@@ -106,4 +113,4 @@ function esHoraDeActualizar(fecha) {
   return fecha instanceof Date && fecha.getHours() === 4;
 }
 
-module.exports = { MODOS, DESTINOS, PAPELES, PORTADA, ajustesValidos, anchoParaMedir, tamanoDelPapel, tandas, impresoraPara, faltaPorElegir, esDeComandi, tituloCon, esHoraDeActualizar };
+module.exports = { MODOS, DESTINOS, PAPELES, IMPRIMIBLE, PORTADA, ajustesValidos, anchoParaMedir, tamanoDelPapel, tandas, impresoraPara, faltaPorElegir, esDeComandi, tituloCon, esHoraDeActualizar };

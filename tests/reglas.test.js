@@ -60,12 +60,12 @@ test('el papel: 80 mm y a la medida si no se dice nada', () => {
 });
 
 test('el tamaño del papel de un ticket, en micras', () => {
-  // 378 px = 100 mm; + 8 mm de margen y holgura = 108 mm.
-  assert.deepEqual(r.tamanoDelPapel(80, 377.95), { width: 80000, height: 108000 });
-  assert.deepEqual(r.tamanoDelPapel(58, 10), { width: 58000, height: 30000 }, 'nunca menos de 3 cm');
+  // 378 px = 100 mm; + 8 mm de holgura = 108 mm. El ancho, el que imprime la impresora (06/11/2026).
+  assert.deepEqual(r.tamanoDelPapel(80, 377.95), { width: 72000, height: 108000 });
+  assert.deepEqual(r.tamanoDelPapel(58, 10), { width: 48000, height: 30000 }, 'nunca menos de 3 cm');
   assert.equal(r.tamanoDelPapel(80, 1e9).height, 3000000, 'nunca más de 3 m');
   assert.equal(r.tamanoDelPapel(80, 0), null);
   assert.equal(r.tamanoDelPapel(80, 'x'), null);
-  assert.equal(r.anchoParaMedir(80), 74);
-  assert.equal(r.anchoParaMedir(58), 52);
+  assert.equal(r.anchoParaMedir(80), 72);
+  assert.equal(r.anchoParaMedir(58), 48);
 });

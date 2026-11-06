@@ -11,6 +11,13 @@
 
 const reglas = require('./reglas');
 
+// Lo mismo al medir y al imprimir (06/11/2026): la página sin márgenes ni
+// tamaño propios (manda el papel que pide la aplicación, del ancho que imprime
+// la impresora) y 1,5 mm de aire a cada lado. Si al medir y al imprimir el
+// ancho no fuera el mismo, el ticket saldría cortado por la derecha o por abajo.
+const CSS_PAPEL = '@page { size: auto !important; margin: 0 !important; } '
+  + 'html { box-sizing: border-box !important; padding-left: 1.5mm !important; padding-right: 1.5mm !important; }';
+
 // Mide los tickets que salen ahora al imprimir y los numera. Devuelve sus
 // altos en píxeles (vacío si no hay ninguno). Se ejecuta en la página, ya «en
 // modo impresión»: la página se pone del ancho del papel y, ticket a ticket,
@@ -25,7 +32,7 @@ function guionMedir(anchoMm) {
     if (!tickets.length) return [];
     tickets.forEach((t, i) => t.setAttribute('data-comandi-trozo', String(i)));
     const ancho = document.createElement('style');
-    ancho.textContent = 'html { width: ${ancho}mm !important; max-width: ${ancho}mm !important; }';
+    ancho.textContent = 'html { width: ${ancho}mm !important; max-width: ${ancho}mm !important; } ${CSS_PAPEL}';
     document.head.appendChild(ancho);
     const solo = document.createElement('style');
     document.head.appendChild(solo);
@@ -48,7 +55,7 @@ function guionSolo(i) {
   return `(() => {
     let st = document.getElementById('comandi-solo');
     if (!st) { st = document.createElement('style'); st.id = 'comandi-solo'; document.head.appendChild(st); }
-    st.textContent = '@media print { [data-comandi-trozo]:not([data-comandi-trozo="${n}"]) { display: none !important; } '
+    st.textContent = '@media print { ${CSS_PAPEL} [data-comandi-trozo]:not([data-comandi-trozo="${n}"]) { display: none !important; } '
       + '[data-comandi-trozo] { break-before: auto !important; page-break-before: auto !important; '
       + 'break-after: auto !important; page-break-after: auto !important; } }';
     return true;
@@ -104,4 +111,4 @@ async function imprimirALaMedida(webContents, papelMm, imprimir) {
   }
 }
 
-module.exports = { guionMedir, guionSolo, GUION_LIMPIAR, medirTickets, imprimirALaMedida };
+module.exports = { CSS_PAPEL, guionMedir, guionSolo, GUION_LIMPIAR, medirTickets, imprimirALaMedida };
