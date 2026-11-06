@@ -16,6 +16,15 @@ if (esComandi) {
     abrirAjustes: () => ipcRenderer.send('comandi:abrir-ajustes'),
     // Los pedidos sin atender: van al título y hacen parpadear la barra.
     aviso: (pendientes) => ipcRenderer.send('comandi:aviso', Number(pendientes) || 0),
+    // La CashDro (06/11/2026): cobrar en el mostrador. `lista()` dice si este
+    // ordenador la tiene configurada. Importes en céntimos.
+    cashdro: {
+      lista: () => ipcRenderer.invoke('comandi:cashdro-lista'),
+      cobrar: (centimos) => ipcRenderer.invoke('comandi:cashdro-cobrar', Number(centimos) || 0),
+      estado: (operacion) => ipcRenderer.invoke('comandi:cashdro-estado', String(operacion || '')),
+      cancelar: (operacion) => ipcRenderer.invoke('comandi:cashdro-cancelar', String(operacion || '')),
+      soltar: (operacion) => ipcRenderer.send('comandi:cashdro-soltar', String(operacion || '')),
+    },
     // Para volver a preguntar las tandas cuando cambian los ajustes.
     alCambiarAjustes: (fn) => { ipcRenderer.on('comandi:ajustes-cambiados', () => { try { fn(); } catch (e) { /* da igual */ } }); },
   });

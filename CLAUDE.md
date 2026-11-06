@@ -25,5 +25,10 @@ tareas. El tablero la reconoce por `window.comandiEscritorio` (`src/preload.js`;
 
 ## Lo que viene
 
-- CashDro de Servi-Loli (CashDro 3, de Softsanz): ver la memoria `app-escritorio`.
+- **CashDro (desde la 0.4.0, 06/11/2026):** cobrar en el mostrador. `src/cashdro.js` (las operaciones,
+  puro: index3.php como Odoo e index.php como OCA/Trey), `src/cashdroRed.js` (la red: **huella del
+  certificado** apuntada al «Probar conexión»; sin ella no se cobra y a otra máquina no se le manda
+  nada), en `main.js` los `comandi:cashdro-*` y la contraseña cifrada con `safeStorage`. En el panel:
+  `lib/cobroCashdro.js` y `app/pedidos/CobroCashdro.js`. Nunca se reinicia para actualizarse a mitad de
+  un cobro. Pendiente: los repartidores (liquidar al volver y cambio al salir).
 - Mac (99 €/año de Apple para firmar).

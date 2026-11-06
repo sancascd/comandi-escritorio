@@ -27,6 +27,31 @@ function texto(v) {
   return typeof v === 'string' ? v.trim().slice(0, 200) : '';
 }
 
+// LA CASHDRO (06/11/2026, src/cashdro.js): dónde está y con qué usuario. La
+// contraseña se guarda cifrada con la cuenta de Windows (`claveCifrada`, la
+// cifra la aplicación) y nunca se le enseña a nadie. `ruta` y `protocolo`, los
+// que contestaron al probar.
+function cashdroValida(c) {
+  const g = c && typeof c === 'object' ? c : {};
+  const ip = texto(g.ip).replace(/^https?:\/\//i, '').replace(/\/.*$/, '');
+  return {
+    ip: /^[a-z0-9.\-]{1,100}(:\d{1,5})?$/i.test(ip) ? ip : '',
+    usuario: texto(g.usuario),
+    claveCifrada: typeof g.claveCifrada === 'string' ? g.claveCifrada.slice(0, 4000) : '',
+    ruta: g.ruta === 'index' ? 'index' : 'index3',
+    protocolo: g.protocolo === 'http' ? 'http' : 'https',
+    // La huella del certificado de la máquina, apuntada al probar (src/main.js).
+    huella: typeof g.huella === 'string' && /^[0-9A-F:]{20,200}$/i.test(g.huella) ? g.huella : '',
+  };
+}
+
+// ¿Está lista para cobrar? IP, usuario y contraseña puestos.
+function cashdroLista(ajustes) {
+  const c = ajustes && ajustes.cashdro;
+  // Y probada: por https hace falta la huella de su certificado (se apunta al probar).
+  return !!(c && c.ip && c.usuario && c.claveCifrada && (c.huella || c.protocolo === 'http'));
+}
+
 // Los ajustes guardados, limpios y con todo lo que falte puesto.
 function ajustesValidos(guardados) {
   const g = guardados && typeof guardados === 'object' ? guardados : {};
@@ -41,6 +66,7 @@ function ajustesValidos(guardados) {
     // acabar. Encendido salvo que se apague; el rollo, de 80 mm si no se dice.
     papel: PAPELES.includes(Number(g.papel)) ? Number(g.papel) : 80,
     papelJusto: g.papelJusto !== false,
+    cashdro: cashdroValida(g.cashdro),
   };
 }
 
@@ -124,10 +150,11 @@ function esHoraDeActualizar(fecha) {
 // `quietoSeg`, los segundos sin tocar teclado ni ratón.
 const TRANQUILO_MS = 10 * 60 * 1000;
 const QUIETO_SEG = 5 * 60;
-function esMomentoTranquilo({ ahora, ultimaImpresion, quietoSeg }) {
+function esMomentoTranquilo({ ahora, ultimaImpresion, quietoSeg, cobrando }) {
+  if (cobrando) return false; // nunca a mitad de un cobro en la CashDro
   if (!(Number(quietoSeg) >= QUIETO_SEG)) return false;
   if (ultimaImpresion == null) return true;
   return Number(ahora) - Number(ultimaImpresion) >= TRANQUILO_MS;
 }
 
-module.exports = { MODOS, DESTINOS, PAPELES, IMPRIMIBLE, PORTADA, ajustesValidos, anchoParaMedir, tamanoDelPapel, tandas, impresoraPara, faltaPorElegir, esDeComandi, tituloCon, esHoraDeActualizar, esMomentoTranquilo };
+module.exports = { MODOS, DESTINOS, PAPELES, IMPRIMIBLE, PORTADA, ajustesValidos, anchoParaMedir, tamanoDelPapel, tandas, impresoraPara, faltaPorElegir, esDeComandi, tituloCon, esHoraDeActualizar, esMomentoTranquilo, cashdroValida, cashdroLista };

@@ -11,11 +11,12 @@
 //   · no abrir nada que no sea comandi.es (lo demás va al navegador).
 // El tablero la reconoce por `window.comandiEscritorio` (src/preload.js).
 
-const { app, BrowserWindow, ipcMain, shell, dialog, Menu, powerSaveBlocker, powerMonitor } = require('electron');
+const { app, BrowserWindow, ipcMain, shell, dialog, Menu, powerSaveBlocker, powerMonitor, safeStorage } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const reglas = require('./reglas');
 const papel = require('./papel');
+const cashdro = require('./cashdro');
 const { autoUpdater } = require('electron-updater');
 
 let ventana = null;
@@ -114,7 +115,7 @@ function abrirAjustes() {
   if (ventanaAjustes) { ventanaAjustes.focus(); return; }
   ventanaAjustes = new BrowserWindow({
     width: 560,
-    height: 640,
+    height: 900, // con la CashDro (06/11/2026): todo a la vista, sin desplazar
     resizable: false,
     parent: ventana || undefined,
     modal: false,
@@ -176,12 +177,122 @@ ipcMain.on('comandi:aviso', (evento, pendientes) => {
   if (Number(pendientes) > 0 && !ventana.isFocused()) ventana.flashFrame(true);
 });
 
+// ---------- La CashDro (06/11/2026, src/cashdro.js) ----------
+// La contraseña, cifrada con la cuenta de Windows de este ordenador.
+function cifrar(texto) {
+  if (!safeStorage.isEncryptionAvailable()) return '';
+  return safeStorage.encryptString(String(texto)).toString('base64');
+}
+function descifrar(b64) {
+  if (!b64 || !safeStorage.isEncryptionAvailable()) return '';
+  try { return safeStorage.decryptString(Buffer.from(b64, 'base64')); } catch (e) { return ''; }
+}
+
+// La petición a la máquina, con la huella de su certificado: src/cashdroRed.js.
+const peticionCashdro = require('./cashdroRed').peticion;
+
+// Para cobrar: con la huella apuntada (si va por https y no hay, hay que probar antes).
+function cfgCashdro() {
+  const c = leerAjustes().cashdro;
+  return { ip: c.ip, usuario: c.usuario, clave: descifrar(c.claveCifrada), ruta: c.ruta, protocolo: c.protocolo, huella: c.huella };
+}
+function peticionCobro(cfg) {
+  return (url) => {
+    if (cfg.protocolo !== 'http' && !cfg.huella) {
+      return Promise.reject(new Error('falta «Probar conexión» en Impresoras y ajustes'));
+    }
+    return peticionCashdro(url, cfg.protocolo === 'http' ? null : cfg.huella);
+  };
+}
+
+// La última prueba que salió bien, para guardar con los ajustes lo que contestó.
+let ultimaPrueba = null;
+
+// El cobro que está en marcha (solo uno a la vez). Mientras, la aplicación no
+// se reinicia para actualizarse.
+let cobroEnCurso = null;
+const errorDe = (e) => ({ ok: false, error: e && e.message ? 'No se llega a la máquina: ' + e.message : 'No se llega a la máquina' });
+
+ipcMain.handle('comandi:cashdro-lista', (evento) => desdeComandi(evento) && reglas.cashdroLista(leerAjustes()));
+ipcMain.handle('comandi:cashdro-cobrar', async (evento, centimos) => {
+  if (!desdeComandi(evento)) return { ok: false, error: 'No permitido' };
+  if (!reglas.cashdroLista(leerAjustes())) return { ok: false, error: 'La CashDro no está configurada en este ordenador' };
+  try {
+    const cfg = cfgCashdro();
+    // Si quedó uno apuntado (se recargó el tablero a mitad), se mira si ya acabó.
+    if (cobroEnCurso) {
+      const antes = await cashdro.comoVa(peticionCobro(cfg), cfg, cobroEnCurso).catch(() => null);
+      if (antes && antes.ok && antes.terminada) cobroEnCurso = null;
+      else return { ok: false, error: 'Ya hay un cobro en marcha en la CashDro: acábalo o cancélalo en la máquina' };
+    }
+    const r = await cashdro.empezarCobro(peticionCobro(cfg), cfg, centimos);
+    if (r.ok) cobroEnCurso = r.operacion;
+    return r;
+  } catch (e) { return errorDe(e); }
+});
+ipcMain.handle('comandi:cashdro-estado', async (evento, operacion) => {
+  if (!desdeComandi(evento)) return { ok: false, error: 'No permitido' };
+  try {
+    const cfg = cfgCashdro();
+    const r = await cashdro.comoVa(peticionCobro(cfg), cfg, String(operacion || ''));
+    if (r.ok && r.terminada && cobroEnCurso === String(operacion)) cobroEnCurso = null;
+    return r;
+  } catch (e) { return errorDe(e); }
+});
+ipcMain.handle('comandi:cashdro-cancelar', async (evento, operacion) => {
+  if (!desdeComandi(evento)) return { ok: false, error: 'No permitido' };
+  try {
+    const cfg = cfgCashdro();
+    return await cashdro.cancelar(peticionCobro(cfg), cfg, String(operacion || ''));
+  } catch (e) { return errorDe(e); }
+});
+// El tablero da el cobro por acabado (o se ha recargado y lo suelta).
+ipcMain.on('comandi:cashdro-soltar', (evento, operacion) => {
+  if (desdeComandi(evento) && cobroEnCurso === String(operacion)) cobroEnCurso = null;
+});
+
 // ---------- Lo que pide la ventana de ajustes (src/preload-ajustes.js) ----------
 function desdeAjustes(evento) {
   return !!(ventanaAjustes && evento && evento.sender === ventanaAjustes.webContents);
 }
-ipcMain.handle('ajustes:leer', (evento) => (desdeAjustes(evento) ? leerAjustes() : null));
-ipcMain.handle('ajustes:guardar', (evento, nuevos) => (desdeAjustes(evento) ? guardarAjustes(nuevos) : null));
+// La ventana de ajustes nunca ve la contraseña de la CashDro: solo si hay una.
+function paraLaVentana(a) {
+  const { claveCifrada, huella, ...resto } = a.cashdro;
+  return { ...a, cashdro: { ...resto, tieneClave: !!claveCifrada, probada: !!huella || resto.protocolo === 'http' } };
+}
+ipcMain.handle('ajustes:leer', (evento) => (desdeAjustes(evento) ? paraLaVentana(leerAjustes()) : null));
+ipcMain.handle('ajustes:guardar', (evento, nuevos) => {
+  if (!desdeAjustes(evento)) return null;
+  const antes = leerAjustes();
+  const n = nuevos && typeof nuevos === 'object' ? nuevos : {};
+  // Si no viene nada de la CashDro, se queda como estaba.
+  if (!n.cashdro || typeof n.cashdro !== 'object') return paraLaVentana(guardarAjustes({ ...n, cashdro: antes.cashdro }));
+  const c = n.cashdro;
+  // La contraseña: si se escribe una, se cifra; si se deja en blanco, la de antes.
+  let claveCifrada = antes.cashdro.claveCifrada;
+  if (c.borrarClave) claveCifrada = '';
+  else if (typeof c.clave === 'string' && c.clave !== '') claveCifrada = cifrar(c.clave);
+  const ip = reglas.cashdroValida(c).ip;
+  // Lo que contestó al probar: de la prueba de ahora si es esa IP; si no, lo de
+  // antes si la IP no ha cambiado; y si ha cambiado, hay que volver a probar.
+  const prueba = ultimaPrueba && ultimaPrueba.ip === ip ? ultimaPrueba
+    : (ip === antes.cashdro.ip ? antes.cashdro : {});
+  return paraLaVentana(guardarAjustes({
+    ...n,
+    cashdro: { ip, usuario: c.usuario, claveCifrada, ruta: prueba.ruta, protocolo: prueba.protocolo, huella: prueba.huella },
+  }));
+});
+ipcMain.handle('ajustes:cashdro-probar', async (evento, datos) => {
+  if (!desdeAjustes(evento)) return { ok: false, error: 'No permitido' };
+  const d = datos && typeof datos === 'object' ? datos : {};
+  const ip = cashdro.ipValida(d.ip);
+  const clave = typeof d.clave === 'string' && d.clave !== '' ? d.clave : descifrar(leerAjustes().cashdro.claveCifrada);
+  try {
+    const r = await cashdro.probar((url) => peticionCashdro(url, null), { ip, usuario: String(d.usuario || '').trim(), clave });
+    if (r.ok) ultimaPrueba = { ip, ruta: r.ruta, protocolo: r.protocolo, huella: r.huella || '' };
+    return { ok: r.ok, error: r.error, aviso: r.aviso || null };
+  } catch (e) { return errorDe(e); }
+});
 ipcMain.handle('ajustes:impresoras', async (evento) => {
   if (!desdeAjustes(evento)) return [];
   const lista = await evento.sender.getPrintersAsync();
@@ -221,7 +332,7 @@ function actualizaciones() {
     if (!actualizacionLista) return;
     const ahora = new Date();
     if (reglas.esHoraDeActualizar(ahora)
-        || reglas.esMomentoTranquilo({ ahora: ahora.getTime(), ultimaImpresion, quietoSeg: powerMonitor.getSystemIdleTime() })) {
+        || reglas.esMomentoTranquilo({ ahora: ahora.getTime(), ultimaImpresion, quietoSeg: powerMonitor.getSystemIdleTime(), cobrando: !!cobroEnCurso })) {
       saliendo = true;
       autoUpdater.quitAndInstall(true, true);
     }

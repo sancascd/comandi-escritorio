@@ -6,4 +6,5 @@ contextBridge.exposeInMainWorld('ajustes', {
   guardar: (nuevos) => ipcRenderer.invoke('ajustes:guardar', nuevos),
   impresoras: () => ipcRenderer.invoke('ajustes:impresoras'),
   probar: (impresora, rotulo) => ipcRenderer.invoke('ajustes:probar', impresora, rotulo),
+  probarCashdro: (datos) => ipcRenderer.invoke('ajustes:cashdro-probar', datos),
 });

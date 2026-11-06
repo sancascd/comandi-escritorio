@@ -16,7 +16,7 @@
   label.opcion:hover { background: var(--fondo); }
   label.opcion small { display: block; color: var(--gris); }
   .fila { display: grid; grid-template-columns: 130px 1fr auto; gap: 8px; align-items: center; margin-top: 8px; }
-  select { width: 100%; padding: 7px 8px; border: 1px solid var(--borde); border-radius: 8px; font: inherit; background: #fff; }
+  select, input[type="text"], input[type="password"] { width: 100%; padding: 7px 8px; border: 1px solid var(--borde); border-radius: 8px; font: inherit; background: #fff; }
   button { font: inherit; border-radius: 999px; border: 1px solid var(--borde); background: #fff; padding: 7px 12px; cursor: pointer; }
   button.principal { background: var(--verde); border-color: var(--verde); color: #fff; font-weight: 600; padding: 10px 20px; }
   button.principal:hover { background: var(--verde-oscuro); }
@@ -70,6 +70,27 @@
     </div>
     <label class="opcion" style="margin-top:8px"><input type="checkbox" id="papel-justo">
       <span>Cortar cada ticket al acabar<small>Cada ticket y cada hoja de cocina sale en su papel, con el largo justo, sin papel en blanco al final.</small></span></label>
+  </div>
+
+  <div class="bloque">
+    <h2>CashDro (cobrar en efectivo)</h2>
+    <p class="sub" style="margin-bottom:8px">Solo si en este mostrador hay una CashDro. Con esto, en el tablero sale «Cobrar en la CashDro» en los pedidos de recogida que se pagan en efectivo.</p>
+    <div class="fila" style="grid-template-columns: 130px 1fr;">
+      <label for="cd-ip">IP de la máquina</label>
+      <input id="cd-ip" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" placeholder="Por ejemplo, 192.168.1.50">
+    </div>
+    <div class="fila" style="grid-template-columns: 130px 1fr;">
+      <label for="cd-usuario">Usuario</label>
+      <input id="cd-usuario" type="text" autocomplete="off" spellcheck="false">
+    </div>
+    <div class="fila" style="grid-template-columns: 130px 1fr;">
+      <label for="cd-clave">Contraseña</label>
+      <input id="cd-clave" type="password" autocomplete="new-password">
+    </div>
+    <p class="sub" id="cd-clave-nota" style="margin:6px 0 0 138px"></p>
+    <div class="pie" style="justify-content:flex-start; margin-top:10px">
+      <button type="button" id="cd-probar">Probar conexión</button>
+    </div>
   </div>
 
   <p class="sub">Comandi se abre sola al encender el ordenador.</p>
