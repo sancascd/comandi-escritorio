@@ -49,6 +49,16 @@ test('se actualiza de madrugada, a las 4', () => {
   assert.equal(r.esHoraDeActualizar(new Date(2026, 9, 27, 14, 0)), false);
 });
 
+// 06/11/2026: en cuanto la cocina está tranquila, no hace falta esperar a las 4.
+test('un momento tranquilo para actualizarse', () => {
+  const ahora = 1_000_000_000;
+  assert.equal(r.esMomentoTranquilo({ ahora, ultimaImpresion: null, quietoSeg: 400 }), true);
+  assert.equal(r.esMomentoTranquilo({ ahora, ultimaImpresion: ahora - 11 * 60000, quietoSeg: 400 }), true);
+  assert.equal(r.esMomentoTranquilo({ ahora, ultimaImpresion: ahora - 3 * 60000, quietoSeg: 400 }), false, 'acaba de imprimir');
+  assert.equal(r.esMomentoTranquilo({ ahora, ultimaImpresion: null, quietoSeg: 30 }), false, 'alguien está usando el ordenador');
+  assert.equal(r.esMomentoTranquilo({ ahora, ultimaImpresion: null }), false, 'sin saberlo, no');
+});
+
 // El papel a la medida (28/10/2026).
 test('el papel: 80 mm y a la medida si no se dice nada', () => {
   const a = r.ajustesValidos(null);

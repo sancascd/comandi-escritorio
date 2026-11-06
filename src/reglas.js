@@ -113,4 +113,21 @@ function esHoraDeActualizar(fecha) {
   return fecha instanceof Date && fecha.getHours() === 4;
 }
 
-module.exports = { MODOS, DESTINOS, PAPELES, IMPRIMIBLE, PORTADA, ajustesValidos, anchoParaMedir, tamanoDelPapel, tandas, impresoraPara, faltaPorElegir, esDeComandi, tituloCon, esHoraDeActualizar };
+// UN MOMENTO TRANQUILO (06/11/2026, Sandra: esperar a la madrugada «es un
+// atraso; cuando necesitan arreglar algo urgente es un coñazo»). Una versión
+// ya bajada se instala en cuanto la cocina está tranquila: nadie ha tocado el
+// ordenador en 5 minutos (así no se pierde un pedido a medio apuntar) y no se
+// ha impreso nada en 10. Los pedidos sin atender no cuentan: siguen en el
+// tablero al volver (y en Servi-Loli se quedan sin marcar todo el día). Se
+// reinicia en unos segundos y el tablero recupera lo que entrara mientras.
+// `ultimaImpresion` en milisegundos (null si no ha impreso desde que se abrió);
+// `quietoSeg`, los segundos sin tocar teclado ni ratón.
+const TRANQUILO_MS = 10 * 60 * 1000;
+const QUIETO_SEG = 5 * 60;
+function esMomentoTranquilo({ ahora, ultimaImpresion, quietoSeg }) {
+  if (!(Number(quietoSeg) >= QUIETO_SEG)) return false;
+  if (ultimaImpresion == null) return true;
+  return Number(ahora) - Number(ultimaImpresion) >= TRANQUILO_MS;
+}
+
+module.exports = { MODOS, DESTINOS, PAPELES, IMPRIMIBLE, PORTADA, ajustesValidos, anchoParaMedir, tamanoDelPapel, tandas, impresoraPara, faltaPorElegir, esDeComandi, tituloCon, esHoraDeActualizar, esMomentoTranquilo };

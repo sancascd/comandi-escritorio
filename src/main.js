@@ -11,7 +11,7 @@
 //   · no abrir nada que no sea comandi.es (lo demás va al navegador).
 // El tablero la reconoce por `window.comandiEscritorio` (src/preload.js).
 
-const { app, BrowserWindow, ipcMain, shell, dialog, Menu, powerSaveBlocker } = require('electron');
+const { app, BrowserWindow, ipcMain, shell, dialog, Menu, powerSaveBlocker, powerMonitor } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const reglas = require('./reglas');
@@ -47,7 +47,10 @@ function aplicarArranque(ajustes) {
 // ---------- Imprimir ----------
 // Imprime lo que esté pintando ahora la página (el tablero pinta los tickets
 // de esa tanda justo antes de pedirlo) en la impresora de esa tanda.
+// Cuándo se imprimió por última vez: para no reiniciarse a mitad de faena.
+let ultimaImpresion = null;
 function imprimirEn(webContents, deviceName, pageSize) {
+  ultimaImpresion = Date.now();
   return new Promise((resolve) => {
     const opciones = { silent: true, printBackground: true, margins: { marginType: 'none' } };
     if (deviceName) opciones.deviceName = deviceName;
@@ -202,6 +205,8 @@ ipcMain.handle('ajustes:probar', async (evento, impresora, rotulo) => {
 // Las versiones nuevas están en GitHub (sancascd/comandi-escritorio, público):
 // se bajan solas y se instalan al cerrar la aplicación o, como en una cocina
 // no se cierra nunca, de madrugada (a las 4), cuando no hay pedidos.
+// Desde el 06/11/2026 mira cada media hora y se instala en el primer momento
+// tranquilo (reglas.esMomentoTranquilo): un arreglo urgente llega en el día.
 let actualizacionLista = false;
 function actualizaciones() {
   if (!app.isPackaged) return;
@@ -211,13 +216,16 @@ function actualizaciones() {
   autoUpdater.on('error', (e) => console.log('[actualizar]', e && e.message));
   const mirar = () => autoUpdater.checkForUpdates().catch((e) => console.log('[actualizar]', e && e.message));
   mirar();
-  setInterval(mirar, 6 * 60 * 60 * 1000);
+  setInterval(mirar, 30 * 60 * 1000);
   setInterval(() => {
-    if (actualizacionLista && reglas.esHoraDeActualizar(new Date())) {
+    if (!actualizacionLista) return;
+    const ahora = new Date();
+    if (reglas.esHoraDeActualizar(ahora)
+        || reglas.esMomentoTranquilo({ ahora: ahora.getTime(), ultimaImpresion, quietoSeg: powerMonitor.getSystemIdleTime() })) {
       saliendo = true;
       autoUpdater.quitAndInstall(true, true);
     }
-  }, 10 * 60 * 1000);
+  }, 60 * 1000);
 }
 
 // ---------- Arranque ----------

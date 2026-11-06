@@ -20,7 +20,7 @@ tareas. El tablero la reconoce por `window.comandiEscritorio` (`src/preload.js`;
    Si falla al desempaquetar *winCodeSign* (enlaces simbólicos sin permiso), extraerlo a mano con
    `node_modules/7zip-bin/win/x64/7za.exe` en `%LOCALAPPDATA%\electron-builder\Cache\winCodeSign\winCodeSign-2.6.0`.
 3. `git push` y `gh release create v<versión> dist/Comandi-Setup.exe dist/Comandi-Setup.exe.blockmap dist/latest.yml --repo sancascd/comandi-escritorio`.
-4. Los ordenadores la bajan solos (miran cada 6 horas) y se instala al cerrar la aplicación o a las
+4. Los ordenadores la bajan solos (miran cada media hora, desde la 0.3.2) y se instala en el primer momento tranquilo (5 min sin tocar el ordenador y 10 sin imprimir), al cerrar la aplicación o a las
    4 de la madrugada.
 
 ## Lo que viene
