@@ -186,4 +186,14 @@ function recortarRegistro(texto, max = MAX_LINEAS_REGISTRO) {
   return lineas.slice(-max).join('\n') + (lineas.length ? '\n' : '');
 }
 
-module.exports = { conTiempoMaximo, TIEMPO_MAX_IMPRESION_MS, lineaDeRegistro, recortarRegistro, MODOS, DESTINOS, PAPELES, IMPRIMIBLE, PORTADA, ajustesValidos, anchoParaMedir, tamanoDelPapel, tandas, impresoraPara, faltaPorElegir, esDeComandi, tituloCon, esHoraDeActualizar, esMomentoTranquilo, cashdroValida, cashdroLista };
+// La orden para cmd.exe que abre la aplicación pasados `segundos` (src/main.js,
+// volverAAbrirseLuego). `ping` hace de reloj: `timeout` no va sin consola.
+// null si la ruta no es un .exe de verdad (nada raro pasa por aquí).
+function ordenVolverAAbrir(exe, segundos) {
+  const ruta = String(exe || '');
+  if (!/^[a-z]:\\[^"<>|&^%]+\.exe$/i.test(ruta)) return null;
+  const s = Math.max(5, Math.min(600, Math.round(Number(segundos) || 60)));
+  return ['/d', '/c', '"ping -n ' + (s + 1) + ' 127.0.0.1 >nul & start "" "' + ruta + '""'];
+}
+
+module.exports = { ordenVolverAAbrir, conTiempoMaximo, TIEMPO_MAX_IMPRESION_MS, lineaDeRegistro, recortarRegistro, MODOS, DESTINOS, PAPELES, IMPRIMIBLE, PORTADA, ajustesValidos, anchoParaMedir, tamanoDelPapel, tandas, impresoraPara, faltaPorElegir, esDeComandi, tituloCon, esHoraDeActualizar, esMomentoTranquilo, cashdroValida, cashdroLista };

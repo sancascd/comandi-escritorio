@@ -354,6 +354,22 @@ ipcMain.handle('ajustes:probar', async (evento, impresora, rotulo) => {
 // Desde el 06/11/2026 mira cada media hora y se instala en el primer momento
 // tranquilo (reglas.esMomentoTranquilo): un arreglo urgente llega en el día.
 let actualizacionLista = false;
+
+// VOLVER A ABRIRSE SÍ O SÍ (09/11/2026). El instalador nuevo abre la
+// aplicación al acabar, pero si por lo que sea no lo hiciera, el restaurante se
+// quedaría sin tablero ni impresora el resto del día sin saberlo. Así que, al
+// irse a actualizar, deja encargado abrirla otra vez dentro de un minuto (lo
+// que tarda en instalarse). Si ya se abrió sola, esa segunda vez solo la trae
+// al frente (requestSingleInstanceLock).
+function volverAAbrirseLuego() {
+  try {
+    const { spawn } = require('child_process');
+    const orden = reglas.ordenVolverAAbrir(process.execPath, 60);
+    if (!orden) return;
+    spawn('cmd.exe', orden, { detached: true, stdio: 'ignore', windowsHide: true, windowsVerbatimArguments: true }).unref();
+  } catch (e) { registrar('no se ha podido dejar encargado volver a abrirse', { ok: false, error: e && e.message }); }
+}
+
 function actualizaciones() {
   if (!app.isPackaged) return;
   autoUpdater.autoDownload = true;
@@ -373,6 +389,7 @@ function actualizaciones() {
         || reglas.esMomentoTranquilo({ ahora: ahora.getTime(), ultimaImpresion, quietoSeg: powerMonitor.getSystemIdleTime(), cobrando: !!cobroEnCurso })) {
       saliendo = true;
       registrar('se reinicia para actualizarse', { ok: true });
+      volverAAbrirseLuego();
       autoUpdater.quitAndInstall(true, true);
     }
   }, 60 * 1000);

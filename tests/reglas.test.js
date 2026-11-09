@@ -110,3 +110,16 @@ test('main.js: imprimir con tiempo máximo, registro y versión', () => {
   const P = require('fs').readFileSync(require('path').join(__dirname, '..', 'src', 'preload.js'), 'utf8');
   assert.match(P, /versionApp: \(\) => ipcRenderer\.invoke\('comandi:version'\)/);
 });
+
+// 09/11/2026: al reiniciarse para actualizarse, se vuelve a abrir sí o sí.
+test('ordenVolverAAbrir: espera y abre la aplicación; nada raro pasa', () => {
+  const exe = String.raw`C:\Users\x\AppData\Local\Programs\comandi-escritorio\Comandi.exe`;
+  assert.deepEqual(r.ordenVolverAAbrir(exe, 60),
+    ['/d', '/c', '"ping -n 61 127.0.0.1 >nul & start "" "' + exe + '""']);
+  assert.equal(r.ordenVolverAAbrir(String.raw`C:\a\b.exe" & del x`, 60), null);
+  assert.equal(r.ordenVolverAAbrir('/usr/bin/electron', 60), null);
+  assert.equal(r.ordenVolverAAbrir('', 60), null);
+  assert.equal(r.ordenVolverAAbrir(exe, 1)[2].startsWith('"ping -n 6 '), true, 'como poco 5 s');
+  const M = require('fs').readFileSync(require('path').join(__dirname, '..', 'src', 'main.js'), 'utf8');
+  assert.match(M, /volverAAbrirseLuego\(\);\s*autoUpdater\.quitAndInstall\(true, true\);/);
+});
