@@ -196,4 +196,33 @@ function ordenVolverAAbrir(exe, segundos) {
   return ['/d', '/c', '"ping -n ' + (s + 1) + ' 127.0.0.1 >nul & start "" "' + ruta + '""'];
 }
 
-module.exports = { ordenVolverAAbrir, conTiempoMaximo, TIEMPO_MAX_IMPRESION_MS, lineaDeRegistro, recortarRegistro, MODOS, DESTINOS, PAPELES, IMPRIMIBLE, PORTADA, ajustesValidos, anchoParaMedir, tamanoDelPapel, tandas, impresoraPara, faltaPorElegir, esDeComandi, tituloCon, esHoraDeActualizar, esMomentoTranquilo, cashdroValida, cashdroLista };
+// SI AL ENCENDER EL ORDENADOR AÚN NO HAY INTERNET (09/11/2026, Servi-Loli: el
+// sábado 08/11 no salió ningún ticket solo de 8:56 a 10:19). La aplicación se
+// abre sola al encender, a veces antes de que haya red; la página no cargaba y
+// la ventana se quedaba en blanco o con el error, sin volver a intentarlo
+// nunca. Ahora, si la que falla es la página principal, se enseña «Conectando
+// con Comandi» y se reintenta cada 10 segundos hasta que entra. -3 es «se ha
+// cancelado» (porque se ha ido a otra página): eso no es un fallo.
+const REINTENTO_MS = 10 * 1000;
+function hayQueReintentar(codigo, esPrincipal) {
+  const c = Number(codigo);
+  return !!esPrincipal && isFinite(c) && c < 0 && c !== -3;
+}
+function paginaSinConexion(motivo) {
+  const m = String(motivo || '').replace(/[<>&"]/g, '').slice(0, 120);
+  return '<!doctype html><html lang="es"><meta charset="utf-8"><title>Comandi</title>'
+    + '<body style="margin:0;height:100vh;display:flex;align-items:center;justify-content:center;'
+    + 'font-family:Segoe UI,system-ui,sans-serif;background:#f6f7f6;color:#1f2a24">'
+    + '<div style="text-align:center;max-width:32rem;padding:2rem">'
+    + '<p style="font-size:2rem;font-weight:700;margin:0 0 .5rem">Conectando con Comandi…</p>'
+    + '<p style="font-size:1.15rem;margin:0 0 1rem">Todavía no hay internet en este ordenador. '
+    + 'Se vuelve a intentar sola cada 10 segundos: no hace falta tocar nada.</p>'
+    + '<p style="font-size:.85rem;color:#6b756f;margin:0">Si en unos minutos sigue igual, mira el wifi o el router.'
+    + (m ? ' (' + m + ')' : '') + '</p></div></body></html>';
+}
+
+// UN TABLERO COLGADO (09/11/2026): si la página deja de responder tanto rato,
+// se vuelve a abrir. Sin tablero no hay tickets.
+const COLGADO_MS = 60 * 1000;
+
+module.exports = { REINTENTO_MS, hayQueReintentar, paginaSinConexion, COLGADO_MS, ordenVolverAAbrir, conTiempoMaximo, TIEMPO_MAX_IMPRESION_MS, lineaDeRegistro, recortarRegistro, MODOS, DESTINOS, PAPELES, IMPRIMIBLE, PORTADA, ajustesValidos, anchoParaMedir, tamanoDelPapel, tandas, impresoraPara, faltaPorElegir, esDeComandi, tituloCon, esHoraDeActualizar, esMomentoTranquilo, cashdroValida, cashdroLista };

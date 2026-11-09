@@ -19,6 +19,11 @@ const papel = require('./papel');
 const cashdro = require('./cashdro');
 const { autoUpdater } = require('electron-updater');
 
+// Para probarla en un ordenador que ya la tiene instalada (solo con `npm start`,
+// nunca en la instalada): otra carpeta de datos y, si se quiere, otra dirección.
+if (!app.isPackaged && process.env.COMANDI_PRUEBA_DATOS) app.setPath('userData', process.env.COMANDI_PRUEBA_DATOS);
+const PORTADA = (!app.isPackaged && process.env.COMANDI_PRUEBA_URL) || reglas.PORTADA;
+
 let ventana = null;
 let ventanaAjustes = null;
 let saliendo = false;
@@ -80,6 +85,14 @@ function registrar(que, r) {
 }
 
 // ---------- La ventana del tablero ----------
+let reintentoTablero = null;
+let colgado = null;
+function abrirTablero() {
+  clearTimeout(reintentoTablero);
+  reintentoTablero = null;
+  if (ventana) ventana.loadURL(PORTADA).catch(() => { /* lo recoge did-fail-load */ });
+}
+
 function crearVentana() {
   ventana = new BrowserWindow({
     width: 1366,
@@ -100,7 +113,36 @@ function crearVentana() {
     },
   });
   ventana.maximize();
-  ventana.loadURL(reglas.PORTADA);
+  abrirTablero();
+
+  // Sin internet al encender (09/11/2026, reglas.hayQueReintentar): «Conectando
+  // con Comandi» y otra vez cada 10 segundos, hasta que entra.
+  ventana.webContents.on('did-fail-load', (evento, codigo, descripcion, url, esPrincipal) => {
+    if (!reglas.hayQueReintentar(codigo, esPrincipal) || !ventana) return;
+    registrar('no se abre el tablero', { ok: false, error: String(descripcion || '') + ' (' + codigo + ')' });
+    ventana.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(reglas.paginaSinConexion(descripcion))).catch(() => {});
+    clearTimeout(reintentoTablero);
+    reintentoTablero = setTimeout(abrirTablero, reglas.REINTENTO_MS);
+  });
+  // Cuándo ha quedado abierto el tablero: para saber, si dicen «no imprimía»,
+  // desde qué hora estaba de verdad funcionando.
+  ventana.webContents.on('did-finish-load', () => {
+    if (ventana && reglas.esDeComandi(ventana.webContents.getURL())) registrar('tablero abierto', { ok: true });
+  });
+  // Si la página se rompe o se queda colgada, se vuelve a abrir.
+  ventana.webContents.on('render-process-gone', (evento, detalles) => {
+    registrar('el tablero se ha cerrado solo', { ok: false, error: detalles && detalles.reason });
+    clearTimeout(reintentoTablero);
+    reintentoTablero = setTimeout(abrirTablero, 2000);
+  });
+  ventana.on('unresponsive', () => {
+    clearTimeout(colgado);
+    colgado = setTimeout(() => {
+      registrar('el tablero no responde: se vuelve a abrir', { ok: false });
+      try { ventana.webContents.forcefullyCrashRenderer(); } catch (e) { abrirTablero(); }
+    }, reglas.COLGADO_MS);
+  });
+  ventana.on('responsive', () => { clearTimeout(colgado); colgado = null; });
 
   // Nada que no sea comandi.es se abre aquí dentro.
   ventana.webContents.setWindowOpenHandler(({ url }) => {

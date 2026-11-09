@@ -123,3 +123,21 @@ test('ordenVolverAAbrir: espera y abre la aplicación; nada raro pasa', () => {
   const M = require('fs').readFileSync(require('path').join(__dirname, '..', 'src', 'main.js'), 'utf8');
   assert.match(M, /volverAAbrirseLuego\(\);\s*autoUpdater\.quitAndInstall\(true, true\);/);
 });
+
+// 09/11/2026: sin internet al encender, se reintenta hasta que entra.
+test('hayQueReintentar: solo la página principal y no al cancelar', () => {
+  assert.equal(r.hayQueReintentar(-105, true), true, 'ERR_NAME_NOT_RESOLVED');
+  assert.equal(r.hayQueReintentar(-106, true), true, 'ERR_INTERNET_DISCONNECTED');
+  assert.equal(r.hayQueReintentar(-3, true), false, 'ERR_ABORTED: se fue a otra página');
+  assert.equal(r.hayQueReintentar(-105, false), false, 'un trozo de la página, no la página');
+  assert.equal(r.hayQueReintentar(0, true), false);
+  assert.equal(r.REINTENTO_MS, 10000);
+  const h = r.paginaSinConexion('ERR_<b>');
+  assert.match(h, /Conectando con Comandi/);
+  assert.ok(!h.includes('<b>'), 'el motivo va sin etiquetas');
+  const M = require('fs').readFileSync(require('path').join(__dirname, '..', 'src', 'main.js'), 'utf8');
+  assert.match(M, /ventana\.webContents\.on\('did-fail-load'/);
+  assert.match(M, /reintentoTablero = setTimeout\(abrirTablero, reglas\.REINTENTO_MS\)/);
+  assert.match(M, /ventana\.webContents\.on\('render-process-gone'/);
+  assert.match(M, /registrar\('tablero abierto'/);
+});
