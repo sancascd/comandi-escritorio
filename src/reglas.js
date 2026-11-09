@@ -157,4 +157,33 @@ function esMomentoTranquilo({ ahora, ultimaImpresion, quietoSeg, cobrando }) {
   return Number(ahora) - Number(ultimaImpresion) >= TRANQUILO_MS;
 }
 
-module.exports = { MODOS, DESTINOS, PAPELES, IMPRIMIBLE, PORTADA, ajustesValidos, anchoParaMedir, tamanoDelPapel, tandas, impresoraPara, faltaPorElegir, esDeComandi, tituloCon, esHoraDeActualizar, esMomentoTranquilo, cashdroValida, cashdroLista };
+// NUNCA SE QUEDA ESPERANDO (09/11/2026, Servi-Loli y Lin Lin: «ya no imprime
+// automáticamente»). Si la impresora se cuelga (sin papel, apagada, el driver
+// atascado), Windows a veces no contesta nunca, y el tablero se quedaba
+// esperando ese ticket: no salía ninguno más hasta recargar. Ahora, pasado
+// `ms`, se da por fallido con `siNo`.
+function conTiempoMaximo(promesa, ms, siNo) {
+  let reloj = null;
+  const tope = new Promise((resolve) => { reloj = setTimeout(() => resolve(siNo), ms); });
+  return Promise.race([Promise.resolve(promesa), tope]).finally(() => clearTimeout(reloj));
+}
+const TIEMPO_MAX_IMPRESION_MS = 60 * 1000;
+
+// EL REGISTRO DE IMPRESIONES (09/11/2026): cada impresión, con su hora y lo
+// que contestó la impresora, en `impresiones.log` (carpeta de la aplicación).
+// Para saber qué pasó cuando dicen «no ha salido». Solo las últimas líneas.
+const MAX_LINEAS_REGISTRO = 1000;
+function lineaDeRegistro(fecha, version, que, r) {
+  const f = fecha instanceof Date ? fecha : new Date();
+  const dos = (n) => String(n).padStart(2, '0');
+  const hora = f.getFullYear() + '-' + dos(f.getMonth() + 1) + '-' + dos(f.getDate()) + ' '
+    + dos(f.getHours()) + ':' + dos(f.getMinutes()) + ':' + dos(f.getSeconds());
+  const estado = r && r.ok ? 'OK' : 'FALLO ' + String((r && r.error) || '').replace(/\s+/g, ' ').slice(0, 200);
+  return hora + ' v' + String(version || '?') + ' ' + String(que || '').replace(/\s+/g, ' ').slice(0, 120) + ' -> ' + estado;
+}
+function recortarRegistro(texto, max = MAX_LINEAS_REGISTRO) {
+  const lineas = String(texto || '').split('\n').filter(Boolean);
+  return lineas.slice(-max).join('\n') + (lineas.length ? '\n' : '');
+}
+
+module.exports = { conTiempoMaximo, TIEMPO_MAX_IMPRESION_MS, lineaDeRegistro, recortarRegistro, MODOS, DESTINOS, PAPELES, IMPRIMIBLE, PORTADA, ajustesValidos, anchoParaMedir, tamanoDelPapel, tandas, impresoraPara, faltaPorElegir, esDeComandi, tituloCon, esHoraDeActualizar, esMomentoTranquilo, cashdroValida, cashdroLista };

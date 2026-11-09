@@ -52,12 +52,31 @@ function aplicarArranque(ajustes) {
 let ultimaImpresion = null;
 function imprimirEn(webContents, deviceName, pageSize) {
   ultimaImpresion = Date.now();
-  return new Promise((resolve) => {
+  const trabajo = new Promise((resolve) => {
     const opciones = { silent: true, printBackground: true, margins: { marginType: 'none' } };
     if (deviceName) opciones.deviceName = deviceName;
     if (pageSize) opciones.pageSize = pageSize; // el papel a la medida (src/papel.js)
-    webContents.print(opciones, (ok, motivo) => resolve({ ok, error: ok ? null : String(motivo || 'No se ha podido imprimir') }));
+    try {
+      webContents.print(opciones, (ok, motivo) => resolve({ ok, error: ok ? null : String(motivo || 'No se ha podido imprimir') }));
+    } catch (e) {
+      resolve({ ok: false, error: String((e && e.message) || e) });
+    }
   });
+  // Si la impresora no contesta, no se queda esperando (09/11/2026).
+  return reglas.conTiempoMaximo(trabajo, reglas.TIEMPO_MAX_IMPRESION_MS,
+    { ok: false, error: 'La impresora no contesta' });
+}
+
+// El registro de impresiones (09/11/2026, reglas.lineaDeRegistro): en la
+// carpeta de la aplicación, %APPDATA%\Comandi\impresiones.log.
+const rutaRegistro = () => path.join(app.getPath('userData'), 'impresiones.log');
+function registrar(que, r) {
+  try {
+    const linea = reglas.lineaDeRegistro(new Date(), app.getVersion(), que, r);
+    let antes = '';
+    try { antes = fs.readFileSync(rutaRegistro(), 'utf8'); } catch (e) { /* aún no hay */ }
+    fs.writeFileSync(rutaRegistro(), reglas.recortarRegistro(antes + linea + '\n'), 'utf8');
+  } catch (e) { /* que el registro nunca impida imprimir */ }
 }
 
 // ---------- La ventana del tablero ----------
@@ -162,14 +181,29 @@ function desdeComandi(evento) {
 
 ipcMain.handle('comandi:tandas', (evento) => (desdeComandi(evento) ? reglas.tandas(leerAjustes()) : []));
 ipcMain.handle('comandi:falta', (evento) => (desdeComandi(evento) ? reglas.faltaPorElegir(leerAjustes()) : []));
-ipcMain.handle('comandi:imprimir', async (evento, destino) => {
+ipcMain.handle('comandi:imprimir', async (evento, destino, que) => {
   if (!desdeComandi(evento)) return { ok: false, error: 'No permitido' };
   const ajustes = leerAjustes();
   const impresora = reglas.impresoraPara(ajustes, destino);
-  if (impresora === null) return { ok: false, error: 'Esa tanda no tiene impresora' };
-  if (!ajustes.papelJusto) return imprimirEn(evento.sender, impresora);
-  return papel.imprimirALaMedida(evento.sender, ajustes.papel, (tamano) => imprimirEn(evento.sender, impresora, tamano));
+  const rotulo = String(que || destino || '') + ' en ' + (impresora || 'la predeterminada');
+  if (impresora === null) {
+    const r = { ok: false, error: 'Esa tanda no tiene impresora' };
+    registrar(rotulo, r);
+    return r;
+  }
+  let r;
+  try {
+    r = !ajustes.papelJusto
+      ? await imprimirEn(evento.sender, impresora)
+      : await papel.imprimirALaMedida(evento.sender, ajustes.papel, (tamano) => imprimirEn(evento.sender, impresora, tamano));
+  } catch (e) {
+    r = { ok: false, error: String((e && e.message) || e) };
+  }
+  registrar(rotulo, r);
+  return r;
 });
+// La versión de la aplicación, para que el tablero la apunte con lo impreso.
+ipcMain.handle('comandi:version', (evento) => (desdeComandi(evento) ? app.getVersion() : null));
 ipcMain.on('comandi:abrir-ajustes', (evento) => { if (desdeComandi(evento)) abrirAjustes(); });
 ipcMain.on('comandi:aviso', (evento, pendientes) => {
   if (!desdeComandi(evento) || !ventana) return;
@@ -309,6 +343,7 @@ ipcMain.handle('ajustes:probar', async (evento, impresora, rotulo) => {
   await prueba.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html));
   const r = await imprimirEn(prueba.webContents, impresora || '');
   prueba.destroy();
+  registrar('prueba de impresora en ' + (impresora || 'la predeterminada'), r);
   return r;
 });
 
@@ -323,7 +358,10 @@ function actualizaciones() {
   if (!app.isPackaged) return;
   autoUpdater.autoDownload = true;
   autoUpdater.autoInstallOnAppQuit = true;
-  autoUpdater.on('update-downloaded', () => { actualizacionLista = true; });
+  autoUpdater.on('update-downloaded', (info) => {
+    actualizacionLista = true;
+    registrar('versión nueva bajada ' + String((info && info.version) || ''), { ok: true });
+  });
   autoUpdater.on('error', (e) => console.log('[actualizar]', e && e.message));
   const mirar = () => autoUpdater.checkForUpdates().catch((e) => console.log('[actualizar]', e && e.message));
   mirar();
@@ -334,6 +372,7 @@ function actualizaciones() {
     if (reglas.esHoraDeActualizar(ahora)
         || reglas.esMomentoTranquilo({ ahora: ahora.getTime(), ultimaImpresion, quietoSeg: powerMonitor.getSystemIdleTime(), cobrando: !!cobroEnCurso })) {
       saliendo = true;
+      registrar('se reinicia para actualizarse', { ok: true });
       autoUpdater.quitAndInstall(true, true);
     }
   }, 60 * 1000);
@@ -346,7 +385,11 @@ if (!app.requestSingleInstanceLock()) {
   app.on('second-instance', () => {
     if (ventana) { if (ventana.isMinimized()) ventana.restore(); ventana.focus(); }
   });
+  // Para que los avisos de Windows (las notificaciones del tablero) salgan con
+  // el nombre de la aplicación, igual que en Chrome (09/11/2026).
+  app.setAppUserModelId('es.comandi.escritorio');
   app.whenReady().then(() => {
+    registrar('se abre la aplicación', { ok: true });
     menu();
     aplicarArranque(leerAjustes());
     // Que el ordenador no se duerma con Comandi abierta.

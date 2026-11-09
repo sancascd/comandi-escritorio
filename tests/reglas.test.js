@@ -79,3 +79,34 @@ test('el tamaño del papel de un ticket, en micras', () => {
   assert.equal(r.anchoParaMedir(80), 72);
   assert.equal(r.anchoParaMedir(58), 48);
 });
+
+// 09/11/2026: una impresora colgada no puede dejar el tablero esperando.
+test('conTiempoMaximo: si no contesta, se da por fallido', async () => {
+  const nunca = new Promise(() => {});
+  assert.deepEqual(await r.conTiempoMaximo(nunca, 20, { ok: false, error: 'La impresora no contesta' }),
+    { ok: false, error: 'La impresora no contesta' });
+  assert.deepEqual(await r.conTiempoMaximo(Promise.resolve({ ok: true }), 1000, null), { ok: true });
+  assert.equal(r.TIEMPO_MAX_IMPRESION_MS, 60000);
+});
+
+test('el registro de impresiones: una línea por impresión y solo las últimas', () => {
+  const f = new Date(2026, 10, 9, 13, 5, 7);
+  assert.equal(r.lineaDeRegistro(f, '0.4.1', '#1A2B en POS-80', { ok: true }), '2026-11-09 13:05:07 v0.4.1 #1A2B en POS-80 -> OK');
+  assert.equal(r.lineaDeRegistro(f, '0.4.1', 'hoja', { ok: false, error: 'La impresora\nno contesta' }),
+    '2026-11-09 13:05:07 v0.4.1 hoja -> FALLO La impresora no contesta');
+  const largo = Array.from({ length: 1005 }, (_, i) => 'l' + i).join('\n');
+  const recortado = r.recortarRegistro(largo);
+  assert.equal(recortado.split('\n').filter(Boolean).length, 1000);
+  assert.ok(recortado.startsWith('l5\n') && recortado.endsWith('l1004\n'));
+  assert.equal(r.recortarRegistro(''), '');
+});
+
+test('main.js: imprimir con tiempo máximo, registro y versión', () => {
+  const M = require('fs').readFileSync(require('path').join(__dirname, '..', 'src', 'main.js'), 'utf8');
+  assert.match(M, /reglas\.conTiempoMaximo\(trabajo, reglas\.TIEMPO_MAX_IMPRESION_MS/);
+  assert.match(M, /registrar\(rotulo, r\)/);
+  assert.match(M, /ipcMain\.handle\('comandi:version'/);
+  assert.match(M, /app\.setAppUserModelId\('es\.comandi\.escritorio'\)/);
+  const P = require('fs').readFileSync(require('path').join(__dirname, '..', 'src', 'preload.js'), 'utf8');
+  assert.match(P, /versionApp: \(\) => ipcRenderer\.invoke\('comandi:version'\)/);
+});

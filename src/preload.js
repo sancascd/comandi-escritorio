@@ -12,7 +12,10 @@ if (esComandi) {
     // Las impresoras que faltan por elegir (si hay alguna, no se imprime bien).
     falta: () => ipcRenderer.invoke('comandi:falta'),
     // Imprime lo que se ve ahora en la impresora de esa tanda: { ok, error }.
-    imprimir: (tanda) => ipcRenderer.invoke('comandi:imprimir', String(tanda || 'todo')),
+    // `que` (09/11/2026): qué es, para el registro de impresiones («#1A2B», «hoja»).
+    imprimir: (tanda, que) => ipcRenderer.invoke('comandi:imprimir', String(tanda || 'todo'), String(que || '').slice(0, 120)),
+    // La versión de la aplicación (09/11/2026), p. ej. '0.4.1'.
+    versionApp: () => ipcRenderer.invoke('comandi:version'),
     abrirAjustes: () => ipcRenderer.send('comandi:abrir-ajustes'),
     // Los pedidos sin atender: van al título y hacen parpadear la barra.
     aviso: (pendientes) => ipcRenderer.send('comandi:aviso', Number(pendientes) || 0),
