@@ -141,3 +141,22 @@ test('hayQueReintentar: solo la página principal y no al cancelar', () => {
   assert.match(M, /ventana\.webContents\.on\('render-process-gone'/);
   assert.match(M, /registrar\('tablero abierto'/);
 });
+
+// 09/11/2026: las impresoras y la CashDro, también desde Ajustes de comandi.es.
+test('ajustes del ordenador desde comandi.es y ventana que cabe en la pantalla', () => {
+  const fs = require('fs'); const path = require('path');
+  const M = fs.readFileSync(path.join(__dirname, '..', 'src', 'main.js'), 'utf8');
+  const P = fs.readFileSync(path.join(__dirname, '..', 'src', 'preload.js'), 'utf8');
+  for (const c of ['leer', 'guardar', 'impresoras', 'probar', 'cashdro-probar']) {
+    const i = M.indexOf("ipcMain.handle('comandi:ajustes-" + c + "'");
+    assert.ok(i > 0, 'falta comandi:ajustes-' + c);
+    assert.ok(M.slice(i, i + 160).includes('desdeComandi(evento)'), 'comandi:ajustes-' + c + ' sin guarda');
+  }
+  assert.match(P, /ajustesOrdenador: \{/);
+  assert.match(M, /webPreferences: preferenciasComandi\(\)/);
+  assert.match(M, /ventana\.webContents\.on\('did-create-window'/);
+  assert.match(M, /screen\.getPrimaryDisplay\(\)\.workAreaSize\.height/);
+  assert.match(M, /resizable: true,/);
+  // La contraseña nunca vuelve a la página.
+  assert.match(M, /const \{ claveCifrada, huella, \.\.\.resto \} = a\.cashdro;/);
+});

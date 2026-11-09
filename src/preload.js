@@ -28,6 +28,16 @@ if (esComandi) {
       cancelar: (operacion) => ipcRenderer.invoke('comandi:cashdro-cancelar', String(operacion || '')),
       soltar: (operacion) => ipcRenderer.send('comandi:cashdro-soltar', String(operacion || '')),
     },
+    // Las impresoras y la CashDro de este ordenador, para el apartado de
+    // Ajustes de comandi.es (09/11/2026). La contraseña se manda una vez para
+    // cifrarla aquí; leer() nunca la devuelve (solo si hay una: tieneClave).
+    ajustesOrdenador: {
+      leer: () => ipcRenderer.invoke('comandi:ajustes-leer'),
+      guardar: (nuevos) => ipcRenderer.invoke('comandi:ajustes-guardar', nuevos),
+      impresoras: () => ipcRenderer.invoke('comandi:ajustes-impresoras'),
+      probar: (impresora, rotulo) => ipcRenderer.invoke('comandi:ajustes-probar', String(impresora || ''), String(rotulo || '')),
+      probarCashdro: (datos) => ipcRenderer.invoke('comandi:ajustes-cashdro-probar', datos),
+    },
     // Para volver a preguntar las tandas cuando cambian los ajustes.
     alCambiarAjustes: (fn) => { ipcRenderer.on('comandi:ajustes-cambiados', () => { try { fn(); } catch (e) { /* da igual */ } }); },
   });

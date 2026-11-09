@@ -11,7 +11,7 @@
 //   · no abrir nada que no sea comandi.es (lo demás va al navegador).
 // El tablero la reconoce por `window.comandiEscritorio` (src/preload.js).
 
-const { app, BrowserWindow, ipcMain, shell, dialog, Menu, powerSaveBlocker, powerMonitor, safeStorage } = require('electron');
+const { app, BrowserWindow, ipcMain, shell, dialog, Menu, powerSaveBlocker, powerMonitor, safeStorage, screen } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const reglas = require('./reglas');
@@ -93,6 +93,29 @@ function abrirTablero() {
   if (ventana) ventana.loadURL(PORTADA).catch(() => { /* lo recoge did-fail-load */ });
 }
 
+// Lo que lleva cualquier ventana con comandi.es dentro.
+function preferenciasComandi() {
+  return {
+    preload: path.join(__dirname, 'preload.js'),
+    contextIsolation: true,
+    nodeIntegration: false,
+    sandbox: true,
+    partition: 'persist:comandi',
+  };
+}
+// Lo de fuera de comandi.es, al navegador; lo de dentro, en una ventana de la aplicación.
+function abrirVentanaHija({ url }) {
+  if (!reglas.esDeComandi(url)) { shell.openExternal(url); return { action: 'deny' }; }
+  return {
+    action: 'allow',
+    overrideBrowserWindowOptions: {
+      autoHideMenuBar: true,
+      icon: path.join(__dirname, 'icono.png'),
+      webPreferences: preferenciasComandi(),
+    },
+  };
+}
+
 function crearVentana() {
   ventana = new BrowserWindow({
     width: 1366,
@@ -145,9 +168,16 @@ function crearVentana() {
   ventana.on('responsive', () => { clearTimeout(colgado); colgado = null; });
 
   // Nada que no sea comandi.es se abre aquí dentro.
-  ventana.webContents.setWindowOpenHandler(({ url }) => {
-    if (!reglas.esDeComandi(url)) { shell.openExternal(url); return { action: 'deny' }; }
-    return { action: 'allow' };
+  ventana.webContents.setWindowOpenHandler(abrirVentanaHija);
+  // Las ventanas que abre el tablero (en el ordenador que imprime, Ajustes y lo
+  // demás se abren aparte para no cerrar el tablero) son también la aplicación
+  // (09/11/2026): con su `comandiEscritorio`, para que en Ajustes salgan las
+  // impresoras y la CashDro de este ordenador, y con las mismas guardas.
+  ventana.webContents.on('did-create-window', (hija) => {
+    hija.webContents.setWindowOpenHandler(abrirVentanaHija);
+    hija.webContents.on('will-navigate', (evento, url) => {
+      if (!reglas.esDeComandi(url)) { evento.preventDefault(); shell.openExternal(url); }
+    });
   });
   ventana.webContents.on('will-navigate', (evento, url) => {
     if (!reglas.esDeComandi(url)) { evento.preventDefault(); shell.openExternal(url); }
@@ -174,10 +204,15 @@ function crearVentana() {
 
 function abrirAjustes() {
   if (ventanaAjustes) { ventanaAjustes.focus(); return; }
+  // Del alto de la pantalla como mucho (09/11/2026: en una pantalla baja, la
+  // CashDro y «Guardar» se quedaban por debajo del borde), y se puede estirar.
+  let alto = 900;
+  try { alto = Math.max(480, Math.min(900, screen.getPrimaryDisplay().workAreaSize.height - 20)); } catch (e) { /* 900 */ }
   ventanaAjustes = new BrowserWindow({
     width: 560,
-    height: 900, // con la CashDro (06/11/2026): todo a la vista, sin desplazar
-    resizable: false,
+    height: alto,
+    minHeight: 400,
+    resizable: true,
     parent: ventana || undefined,
     modal: false,
     title: 'Impresoras y ajustes · Comandi',
@@ -336,9 +371,12 @@ function paraLaVentana(a) {
   const { claveCifrada, huella, ...resto } = a.cashdro;
   return { ...a, cashdro: { ...resto, tieneClave: !!claveCifrada, probada: !!huella || resto.protocolo === 'http' } };
 }
-ipcMain.handle('ajustes:leer', (evento) => (desdeAjustes(evento) ? paraLaVentana(leerAjustes()) : null));
-ipcMain.handle('ajustes:guardar', (evento, nuevos) => {
-  if (!desdeAjustes(evento)) return null;
+// Lo mismo para la ventana de ajustes y para el apartado «Impresoras y CashDro
+// de este ordenador» de Ajustes en comandi.es (09/11/2026, Sandra: «pon esa
+// ventana como un apartado de ajustes, así lo encuentran más fácil»). La
+// contraseña de la CashDro va del formulario a esta aplicación, se cifra aquí
+// y nunca sale del ordenador: ni vuelve a la página ni pasa por comandi.es.
+function ajustesGuardar(nuevos) {
   const antes = leerAjustes();
   const n = nuevos && typeof nuevos === 'object' ? nuevos : {};
   // Si no viene nada de la CashDro, se queda como estaba.
@@ -357,9 +395,8 @@ ipcMain.handle('ajustes:guardar', (evento, nuevos) => {
     ...n,
     cashdro: { ip, usuario: c.usuario, claveCifrada, ruta: prueba.ruta, protocolo: prueba.protocolo, huella: prueba.huella },
   }));
-});
-ipcMain.handle('ajustes:cashdro-probar', async (evento, datos) => {
-  if (!desdeAjustes(evento)) return { ok: false, error: 'No permitido' };
+}
+async function ajustesProbarCashdro(datos) {
   const d = datos && typeof datos === 'object' ? datos : {};
   const ip = cashdro.ipValida(d.ip);
   const clave = typeof d.clave === 'string' && d.clave !== '' ? d.clave : descifrar(leerAjustes().cashdro.claveCifrada);
@@ -368,14 +405,12 @@ ipcMain.handle('ajustes:cashdro-probar', async (evento, datos) => {
     if (r.ok) ultimaPrueba = { ip, ruta: r.ruta, protocolo: r.protocolo, huella: r.huella || '' };
     return { ok: r.ok, error: r.error, aviso: r.aviso || null };
   } catch (e) { return errorDe(e); }
-});
-ipcMain.handle('ajustes:impresoras', async (evento) => {
-  if (!desdeAjustes(evento)) return [];
-  const lista = await evento.sender.getPrintersAsync();
+}
+async function ajustesImpresoras(webContents) {
+  const lista = await webContents.getPrintersAsync();
   return lista.map((p) => ({ nombre: p.name, visible: p.displayName || p.name, predeterminada: !!p.isDefault }));
-});
-ipcMain.handle('ajustes:probar', async (evento, impresora, rotulo) => {
-  if (!desdeAjustes(evento)) return { ok: false, error: 'No permitido' };
+}
+async function ajustesProbarImpresora(impresora, rotulo) {
   const prueba = new BrowserWindow({ show: false, webPreferences: { sandbox: true } });
   const html = '<!doctype html><meta charset="utf-8"><body style="font-family:monospace;font-size:14px;margin:0;padding:8px">'
     + '<p style="font-size:20px;font-weight:bold;text-align:center">COMANDI</p>'
@@ -383,11 +418,33 @@ ipcMain.handle('ajustes:probar', async (evento, impresora, rotulo) => {
     + String(rotulo || '').replace(/[<>&]/g, '') + '</p><p style="text-align:center">' + new Date().toLocaleString('es-ES')
     + '</p><p>--------------------------------</p></body>';
   await prueba.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html));
-  const r = await imprimirEn(prueba.webContents, impresora || '');
+  const r = await imprimirEn(prueba.webContents, typeof impresora === 'string' ? impresora : '');
   prueba.destroy();
   registrar('prueba de impresora en ' + (impresora || 'la predeterminada'), r);
   return r;
+}
+// Tras guardar, el tablero vuelve a mirar sus impresoras y la CashDro.
+function avisarAjustesCambiados() {
+  if (ventana) ventana.webContents.send('comandi:ajustes-cambiados');
+}
+
+ipcMain.handle('ajustes:leer', (evento) => (desdeAjustes(evento) ? paraLaVentana(leerAjustes()) : null));
+ipcMain.handle('ajustes:guardar', (evento, nuevos) => (desdeAjustes(evento) ? ajustesGuardar(nuevos) : null));
+ipcMain.handle('ajustes:cashdro-probar', (evento, datos) => (desdeAjustes(evento) ? ajustesProbarCashdro(datos) : { ok: false, error: 'No permitido' }));
+ipcMain.handle('ajustes:impresoras', (evento) => (desdeAjustes(evento) ? ajustesImpresoras(evento.sender) : []));
+ipcMain.handle('ajustes:probar', (evento, impresora, rotulo) => (desdeAjustes(evento) ? ajustesProbarImpresora(impresora, rotulo) : { ok: false, error: 'No permitido' }));
+
+// Desde Ajustes de comandi.es (src/preload.js, `ajustesOrdenador`).
+ipcMain.handle('comandi:ajustes-leer', (evento) => (desdeComandi(evento) ? paraLaVentana(leerAjustes()) : null));
+ipcMain.handle('comandi:ajustes-guardar', (evento, nuevos) => {
+  if (!desdeComandi(evento)) return null;
+  const r = ajustesGuardar(nuevos);
+  avisarAjustesCambiados();
+  return r;
 });
+ipcMain.handle('comandi:ajustes-cashdro-probar', (evento, datos) => (desdeComandi(evento) ? ajustesProbarCashdro(datos) : { ok: false, error: 'No permitido' }));
+ipcMain.handle('comandi:ajustes-impresoras', (evento) => (desdeComandi(evento) ? ajustesImpresoras(evento.sender) : []));
+ipcMain.handle('comandi:ajustes-probar', (evento, impresora, rotulo) => (desdeComandi(evento) ? ajustesProbarImpresora(impresora, rotulo) : { ok: false, error: 'No permitido' }));
 
 // ---------- Actualizarse sola (26/10/2026) ----------
 // Las versiones nuevas están en GitHub (sancascd/comandi-escritorio, público):
