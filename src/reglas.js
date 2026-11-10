@@ -199,6 +199,19 @@ function ordenVolverAAbrir(exe, segundos) {
   return ['/d', '/c', '"ping -n ' + (s + 1) + ' 127.0.0.1 >nul & start "" "' + ruta + '""'];
 }
 
+// SIN VENTANA NEGRA (10/11/2026, a Sandra le salió la ventana del «ping» al
+// actualizarse: la Terminal de Windows 11 no hace caso a «ábrela oculta»). El
+// reloj de «volver a abrirse» va ahora en un guion de Windows (wscript), que no
+// abre ninguna ventana: espera y abre la aplicación. El de cmd queda de
+// reserva, por si wscript no está. null si la ruta no es un .exe de verdad.
+function guionVolverAAbrir(exe, segundos) {
+  const ruta = String(exe || '');
+  if (!/^[a-z]:\\[^"<>|&^%]+\.exe$/i.test(ruta)) return null;
+  const s = Math.max(5, Math.min(600, Math.round(Number(segundos) || 60)));
+  return 'WScript.Sleep ' + (s * 1000) + '\r\n'
+    + 'CreateObject("WScript.Shell").Run """' + ruta + '""", 1, False\r\n';
+}
+
 // SI AL ENCENDER EL ORDENADOR AÚN NO HAY INTERNET (09/11/2026, Servi-Loli: el
 // sábado 08/11 no salió ningún ticket solo de 8:56 a 10:19). La aplicación se
 // abre sola al encender, a veces antes de que haya red; la página no cargaba y
@@ -228,4 +241,4 @@ function paginaSinConexion(motivo) {
 // se vuelve a abrir. Sin tablero no hay tickets.
 const COLGADO_MS = 60 * 1000;
 
-module.exports = { REINTENTO_MS, hayQueReintentar, paginaSinConexion, COLGADO_MS, ordenVolverAAbrir, conTiempoMaximo, TIEMPO_MAX_IMPRESION_MS, lineaDeRegistro, recortarRegistro, MODOS, DESTINOS, PAPELES, IMPRIMIBLE, PORTADA, ajustesValidos, anchoParaMedir, tamanoDelPapel, tandas, impresoraPara, faltaPorElegir, esDeComandi, tituloCon, esHoraDeActualizar, esMomentoTranquilo, cashdroValida, cashdroLista };
+module.exports = { guionVolverAAbrir, REINTENTO_MS, hayQueReintentar, paginaSinConexion, COLGADO_MS, ordenVolverAAbrir, conTiempoMaximo, TIEMPO_MAX_IMPRESION_MS, lineaDeRegistro, recortarRegistro, MODOS, DESTINOS, PAPELES, IMPRIMIBLE, PORTADA, ajustesValidos, anchoParaMedir, tamanoDelPapel, tandas, impresoraPara, faltaPorElegir, esDeComandi, tituloCon, esHoraDeActualizar, esMomentoTranquilo, cashdroValida, cashdroLista };

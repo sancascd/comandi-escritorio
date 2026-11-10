@@ -535,8 +535,21 @@ let actualizacionLista = false;
 // que tarda en instalarse). Si ya se abrió sola, esa segunda vez solo la trae
 // al frente (requestSingleInstanceLock).
 function volverAAbrirseLuego() {
+  const { spawn } = require('child_process');
+  // Sin ventana (10/11/2026): un guion de wscript que espera y la abre.
   try {
-    const { spawn } = require('child_process');
+    const guion = reglas.guionVolverAAbrir(process.execPath, 60);
+    if (guion) {
+      const archivo = path.join(app.getPath('userData'), 'volver-a-abrir.vbs');
+      fs.writeFileSync(archivo, guion, 'utf8');
+      const hijo = spawn('wscript.exe', ['//B', '//Nologo', archivo], { detached: true, stdio: 'ignore', windowsHide: true });
+      hijo.on('error', () => { /* sin wscript: no hay reserva posible ya, la app se va */ });
+      hijo.unref();
+      return;
+    }
+  } catch (e) { /* abajo, la de reserva */ }
+  // De reserva, la de antes (con ventana).
+  try {
     const orden = reglas.ordenVolverAAbrir(process.execPath, 60);
     if (!orden) return;
     spawn('cmd.exe', orden, { detached: true, stdio: 'ignore', windowsHide: true, windowsVerbatimArguments: true }).unref();

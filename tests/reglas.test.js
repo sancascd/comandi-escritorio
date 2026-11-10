@@ -160,3 +160,14 @@ test('ajustes del ordenador desde comandi.es y ventana que cabe en la pantalla',
   // La contraseña nunca vuelve a la página.
   assert.match(M, /const \{ claveCifrada, huella, \.\.\.resto \} = a\.cashdro;/);
 });
+
+// 10/11/2026: volver a abrirse sin ventana negra (wscript en vez de cmd).
+test('guionVolverAAbrir: espera y abre la aplicación, sin ventana; nada raro pasa', () => {
+  const exe = String.raw`C:\Users\x\AppData\Local\Programs\comandi-escritorio\Comandi.exe`;
+  assert.equal(r.guionVolverAAbrir(exe, 60),
+    'WScript.Sleep 60000\r\nCreateObject("WScript.Shell").Run """' + exe + '""", 1, False\r\n');
+  assert.equal(r.guionVolverAAbrir(String.raw`C:\a\b.exe" & del x`, 60), null);
+  assert.equal(r.guionVolverAAbrir('', 60), null);
+  const M = require('fs').readFileSync(require('path').join(__dirname, '..', 'src', 'main.js'), 'utf8');
+  assert.match(M, /spawn\('wscript\.exe', \['\/\/B', '\/\/Nologo', archivo\]/);
+});
