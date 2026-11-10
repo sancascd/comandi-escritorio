@@ -66,6 +66,9 @@ function ajustesValidos(guardados) {
     // acabar. Encendido salvo que se apague; el rollo, de 80 mm si no se dice.
     papel: PAPELES.includes(Number(g.papel)) ? Number(g.papel) : 80,
     papelJusto: g.papelJusto !== false,
+    // Modo directo (10/11/2026, src/directo.js): para las impresoras que con el
+    // controlador de Windows sacan el papel en blanco. Apagado salvo que se elija.
+    directo: g.directo === true,
     cashdro: cashdroValida(g.cashdro),
   };
 }

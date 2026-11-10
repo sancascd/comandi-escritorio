@@ -32,6 +32,7 @@
   $('imp-cliente').value = guardados.impresoras.cliente || '';
   $('papel').value = String(guardados.papel || 80);
   $('papel-justo').checked = guardados.papelJusto !== false;
+  $('directo').checked = guardados.directo === true;
   pintarModo();
   document.querySelectorAll('input[name="modo"]').forEach((r) => r.addEventListener('change', pintarModo));
 
@@ -58,7 +59,7 @@
 
   document.querySelectorAll('[data-probar]').forEach((b) => b.addEventListener('click', async () => {
     estado('Imprimiendo una prueba…');
-    const r = await window.ajustes.probar($(b.dataset.probar).value, b.dataset.rotulo);
+    const r = await window.ajustes.probar($(b.dataset.probar).value, b.dataset.rotulo, $('directo').checked);
     estado(r.ok ? 'Prueba enviada. Mira si ha salido el papel.' : 'No ha salido: ' + r.error, r.ok ? 'bien' : 'mal');
   }));
 
@@ -78,6 +79,7 @@
       impresoras: { todo: $('imp-todo').value, cocina: $('imp-cocina').value, cliente: $('imp-cliente').value },
       papel: Number($('papel').value),
       papelJusto: $('papel-justo').checked,
+      directo: $('directo').checked,
       // Sin IP ni usuario, la CashDro se quita de este ordenador.
       cashdro: d.ip || d.usuario ? d : { ip: '', usuario: '', borrarClave: true },
     });

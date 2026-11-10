@@ -16,6 +16,8 @@ const path = require('path');
 const fs = require('fs');
 const reglas = require('./reglas');
 const papel = require('./papel');
+const directo = require('./directo');
+const dibujarTicket = require('./dibujarTicket');
 const cashdro = require('./cashdro');
 const { autoUpdater } = require('electron-updater');
 
@@ -82,6 +84,65 @@ function registrar(que, r) {
     try { antes = fs.readFileSync(rutaRegistro(), 'utf8'); } catch (e) { /* aún no hay */ }
     fs.writeFileSync(rutaRegistro(), reglas.recortarRegistro(antes + linea + '\n'), 'utf8');
   } catch (e) { /* que el registro nunca impida imprimir */ }
+}
+
+// ---------- Modo directo (10/11/2026, src/directo.js) ----------
+// El nombre de la impresora de verdad ('' = la predeterminada de Windows).
+async function nombreDeImpresora(webContents, impresora) {
+  if (impresora) return impresora;
+  try {
+    const lista = await webContents.getPrintersAsync();
+    const pred = lista.find((p) => p.isDefault);
+    return pred ? pred.name : '';
+  } catch (e) { return ''; }
+}
+// Manda los bytes a la cola de Windows en crudo (directo.SCRIPT_RAW).
+function mandarEnCrudo(nombre, bytes) {
+  const { spawn } = require('child_process');
+  const dir = app.getPath('userData');
+  const script = path.join(dir, 'imprimir-directo.ps1');
+  try {
+    let antes = '';
+    try { antes = fs.readFileSync(script, 'utf8'); } catch (e) { /* aún no está */ }
+    if (antes !== directo.SCRIPT_RAW) fs.writeFileSync(script, directo.SCRIPT_RAW, 'utf8');
+  } catch (e) { return Promise.resolve({ ok: false, error: 'No se ha podido preparar el modo directo' }); }
+  const archivo = path.join(dir, 'ticket-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8) + '.bin');
+  fs.writeFileSync(archivo, bytes);
+  const trabajo = new Promise((resolve) => {
+    let salida = '';
+    let hijo;
+    try {
+      hijo = spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', script,
+        '-Impresora', nombre, '-Archivo', archivo], { windowsHide: true });
+    } catch (e) { resolve({ ok: false, error: 'No se ha podido abrir PowerShell' }); return; }
+    hijo.stdout.on('data', (d) => { salida += d; });
+    hijo.stderr.on('data', (d) => { salida += d; });
+    hijo.on('error', () => resolve({ ok: false, error: 'No se ha podido abrir PowerShell' }));
+    hijo.on('close', (codigo) => resolve(codigo === 0 ? { ok: true, error: null } : { ok: false, error: directo.errorDeWindows(salida) }));
+  });
+  return reglas.conTiempoMaximo(trabajo, reglas.TIEMPO_MAX_IMPRESION_MS, { ok: false, error: 'La impresora no contesta' })
+    .finally(() => { try { fs.unlinkSync(archivo); } catch (e) { /* da igual */ } });
+}
+// Dibuja unos tickets (su HTML, con unos estilos) y los manda en modo directo.
+async function imprimirDirectoTickets(webContents, impresora, papelMm, estilos, tickets) {
+  ultimaImpresion = Date.now();
+  const nombre = await nombreDeImpresora(webContents, impresora);
+  if (!nombre) return { ok: false, error: 'No hay impresora elegida ni predeterminada' };
+  if (!tickets || tickets.length === 0) return { ok: false, error: 'No hay nada que imprimir' };
+  const anchoMm = reglas.anchoParaMedir(papelMm);
+  const puntos = directo.puntosDelRollo(papelMm);
+  const partes = [];
+  for (const html of tickets) {
+    const p = await dibujarTicket.dibujar(BrowserWindow, { estilos, html, anchoMm, puntos });
+    if (p.alto > 0) partes.push(directo.ordenesDelTicket(p));
+  }
+  if (partes.length === 0) return { ok: false, error: 'El ticket ha salido vacío al dibujarlo' };
+  return mandarEnCrudo(nombre, Buffer.concat(partes));
+}
+// Lo que pinta ahora el tablero, en modo directo.
+async function imprimirDirectoPagina(webContents, impresora, papelMm) {
+  const { estilos, tickets } = await dibujarTicket.ticketsDeLaPagina(webContents);
+  return imprimirDirectoTickets(webContents, impresora, papelMm, estilos, tickets);
 }
 
 // ---------- La ventana del tablero ----------
@@ -270,9 +331,11 @@ ipcMain.handle('comandi:imprimir', async (evento, destino, que) => {
   }
   let r;
   try {
-    r = !ajustes.papelJusto
-      ? await imprimirEn(evento.sender, impresora)
-      : await papel.imprimirALaMedida(evento.sender, ajustes.papel, (tamano) => imprimirEn(evento.sender, impresora, tamano));
+    r = ajustes.directo
+      ? await imprimirDirectoPagina(evento.sender, impresora, ajustes.papel)
+      : !ajustes.papelJusto
+        ? await imprimirEn(evento.sender, impresora)
+        : await papel.imprimirALaMedida(evento.sender, ajustes.papel, (tamano) => imprimirEn(evento.sender, impresora, tamano));
   } catch (e) {
     r = { ok: false, error: String((e && e.message) || e) };
   }
@@ -410,7 +473,18 @@ async function ajustesImpresoras(webContents) {
   const lista = await webContents.getPrintersAsync();
   return lista.map((p) => ({ nombre: p.name, visible: p.displayName || p.name, predeterminada: !!p.isDefault }));
 }
-async function ajustesProbarImpresora(impresora, rotulo) {
+async function ajustesProbarImpresora(impresora, rotulo, enDirecto, webContents) {
+  // En modo directo (10/11/2026), la prueba también: un ticket dibujado y en crudo.
+  if (enDirecto === true) {
+    const estilos = '.ticket { font-family: "Courier New", monospace; font-size: 11pt; line-height: 1.3; font-weight: bold; text-align: center; } .ticket p { margin: 0 0 1mm; } .ticket .g { font-size: 16pt; }';
+    const html = '<div class="ticket"><p class="g">COMANDI</p><p>Prueba de impresora (modo directo)</p><p>'
+      + String(rotulo || '').replace(/[<>&]/g, '') + '</p><p>' + new Date().toLocaleString('es-ES') + '</p><p>--------------------------------</p></div>';
+    let r;
+    try { r = await imprimirDirectoTickets(webContents, typeof impresora === 'string' ? impresora : '', leerAjustes().papel, estilos, [html]); }
+    catch (e) { r = { ok: false, error: String((e && e.message) || e) }; }
+    registrar('prueba en modo directo en ' + (impresora || 'la predeterminada'), r);
+    return r;
+  }
   const prueba = new BrowserWindow({ show: false, webPreferences: { sandbox: true } });
   const html = '<!doctype html><meta charset="utf-8"><body style="font-family:monospace;font-size:14px;margin:0;padding:8px">'
     + '<p style="font-size:20px;font-weight:bold;text-align:center">COMANDI</p>'
@@ -432,7 +506,7 @@ ipcMain.handle('ajustes:leer', (evento) => (desdeAjustes(evento) ? paraLaVentana
 ipcMain.handle('ajustes:guardar', (evento, nuevos) => (desdeAjustes(evento) ? ajustesGuardar(nuevos) : null));
 ipcMain.handle('ajustes:cashdro-probar', (evento, datos) => (desdeAjustes(evento) ? ajustesProbarCashdro(datos) : { ok: false, error: 'No permitido' }));
 ipcMain.handle('ajustes:impresoras', (evento) => (desdeAjustes(evento) ? ajustesImpresoras(evento.sender) : []));
-ipcMain.handle('ajustes:probar', (evento, impresora, rotulo) => (desdeAjustes(evento) ? ajustesProbarImpresora(impresora, rotulo) : { ok: false, error: 'No permitido' }));
+ipcMain.handle('ajustes:probar', (evento, impresora, rotulo, enDirecto) => (desdeAjustes(evento) ? ajustesProbarImpresora(impresora, rotulo, enDirecto === true, evento.sender) : { ok: false, error: 'No permitido' }));
 
 // Desde Ajustes de comandi.es (src/preload.js, `ajustesOrdenador`).
 ipcMain.handle('comandi:ajustes-leer', (evento) => (desdeComandi(evento) ? paraLaVentana(leerAjustes()) : null));
@@ -444,7 +518,7 @@ ipcMain.handle('comandi:ajustes-guardar', (evento, nuevos) => {
 });
 ipcMain.handle('comandi:ajustes-cashdro-probar', (evento, datos) => (desdeComandi(evento) ? ajustesProbarCashdro(datos) : { ok: false, error: 'No permitido' }));
 ipcMain.handle('comandi:ajustes-impresoras', (evento) => (desdeComandi(evento) ? ajustesImpresoras(evento.sender) : []));
-ipcMain.handle('comandi:ajustes-probar', (evento, impresora, rotulo) => (desdeComandi(evento) ? ajustesProbarImpresora(impresora, rotulo) : { ok: false, error: 'No permitido' }));
+ipcMain.handle('comandi:ajustes-probar', (evento, impresora, rotulo, enDirecto) => (desdeComandi(evento) ? ajustesProbarImpresora(impresora, rotulo, enDirecto === true, evento.sender) : { ok: false, error: 'No permitido' }));
 
 // ---------- Actualizarse sola (26/10/2026) ----------
 // Las versiones nuevas están en GitHub (sancascd/comandi-escritorio, público):
@@ -506,6 +580,14 @@ if (!app.requestSingleInstanceLock()) {
   app.setAppUserModelId('es.comandi.escritorio');
   app.whenReady().then(() => {
     registrar('se abre la aplicación', { ok: true });
+    // Solo con `npm start` (nunca en la instalada): probar el modo directo
+    // contra la impresora que se diga, y salir.
+    if (!app.isPackaged && process.env.COMANDI_PRUEBA_DIRECTO) {
+      const w = new BrowserWindow({ show: false });
+      ajustesProbarImpresora(process.env.COMANDI_PRUEBA_DIRECTO, 'prueba', true, w.webContents)
+        .then((r) => { console.log('[prueba-directo]', JSON.stringify(r)); app.exit(0); });
+      return;
+    }
     menu();
     aplicarArranque(leerAjustes());
     // Que el ordenador no se duerma con Comandi abierta.

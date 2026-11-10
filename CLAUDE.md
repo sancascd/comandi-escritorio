@@ -23,6 +23,16 @@ tareas. El tablero la reconoce por `window.comandiEscritorio` (`src/preload.js`;
 4. Los ordenadores la bajan solos (miran cada media hora, desde la 0.3.2) y se instala en el primer momento tranquilo (5 min sin tocar el ordenador y 10 sin imprimir), al cerrar la aplicación o a las
    4 de la madrugada.
 
+## Modo directo (desde la 0.5.0, 10/11/2026)
+
+Para impresoras que con el controlador de Windows sacan el papel en blanco (Lin Lin): casilla «Modo
+directo» en Impresoras y ajustes. Cada ticket se dibuja en una ventana invisible con los estilos de
+impresión de comandi.es (`src/dibujarTicket.js`), se pasa a puntos (576 en 80 mm, 384 en 58) y se
+manda como imagen ESC/POS (`GS v 0`) en crudo a la cola de Windows con un PowerShell que llama a
+winspool.drv (`src/directo.js`, `SCRIPT_RAW`; se escribe en la carpeta de la aplicación). Probado
+aquí hasta Windows (impresora inexistente → «Windows no encuentra esa impresora»); el papel, en el local.
+Para probar sin instalar: `COMANDI_PRUEBA_DATOS=<carpeta> COMANDI_PRUEBA_DIRECTO="<impresora>" npm start`.
+
 ## Lo que viene
 
 - **CashDro (desde la 0.4.0, 06/11/2026):** cobrar en el mostrador. `src/cashdro.js` (las operaciones,

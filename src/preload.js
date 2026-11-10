@@ -35,7 +35,7 @@ if (esComandi) {
       leer: () => ipcRenderer.invoke('comandi:ajustes-leer'),
       guardar: (nuevos) => ipcRenderer.invoke('comandi:ajustes-guardar', nuevos),
       impresoras: () => ipcRenderer.invoke('comandi:ajustes-impresoras'),
-      probar: (impresora, rotulo) => ipcRenderer.invoke('comandi:ajustes-probar', String(impresora || ''), String(rotulo || '')),
+      probar: (impresora, rotulo, enDirecto) => ipcRenderer.invoke('comandi:ajustes-probar', String(impresora || ''), String(rotulo || ''), enDirecto === true),
       probarCashdro: (datos) => ipcRenderer.invoke('comandi:ajustes-cashdro-probar', datos),
     },
     // Para volver a preguntar las tandas cuando cambian los ajustes.
