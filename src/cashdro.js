@@ -20,6 +20,11 @@ const RUTAS = {
   index: '/Cashdro3WS/index.php',
 };
 const VENTA = 4;
+// SOLTAR DINERO (12/11/2026, Servi-Loli: «el cambio del repartidor lo debe
+// soltar la CashDro»). Es la operación que Odoo usa para las devoluciones
+// (REFUND_TRANSACTION_TYPE = 3 en addons/pos_cashdro/static/src/cashdro_service.js):
+// startOperation con type 3 y el importe en céntimos; la máquina lo da.
+const PAGO = 3;
 // Para cancelar: 3 en index3.php (Odoo) y 2 en index.php (OCA, Trey).
 const CANCELAR = { index3: 3, index: 2 };
 const MAX_CENTIMOS = 100000; // 1.000 €: más que eso en un mostrador es un error
@@ -133,6 +138,26 @@ async function empezarCobro(peticion, cfg, centimos) {
   return { ok: true, operacion: id, error: null };
 }
 
+// Empieza a soltar dinero (el cambio de un repartidor): { ok, operacion, error }.
+async function empezarPago(peticion, cfg, centimos) {
+  const c = centimosValidos(centimos);
+  if (!c) return { ok: false, error: 'Importe no válido' };
+  const r = await operar(peticion, cfg, 'startOperation', {
+    type: PAGO, posid: 'comandi', posuser: cfg.usuario, parameters: JSON.stringify({ amount: String(c) }),
+  });
+  if (!r.ok) return { ok: false, error: r.error };
+  const id = idDeOperacion(r.datos);
+  if (!id) return { ok: false, error: 'La máquina no ha dado número de operación' };
+  const a = await operar(peticion, cfg, 'acknowledgeOperationId', { operationId: id });
+  if (!a.ok) return { ok: false, error: a.error };
+  return { ok: true, operacion: id, error: null };
+}
+
+// PURA. ¿Ha soltado ya todo? Lo que ha dado la máquina cubre el importe.
+function pagadoEntero(estado, centimos) {
+  return !!estado && estado.terminada && estado.devuelto >= centimos;
+}
+
 // Cómo va: { ok, terminada, estado, metido, devuelto, error }.
 async function comoVa(peticion, cfg, operacion) {
   const r = await operar(peticion, cfg, 'askOperation', { operationId: operacion });
@@ -149,7 +174,7 @@ async function cancelar(peticion, cfg, operacion) {
 }
 
 module.exports = {
-  RUTAS, VENTA, CANCELAR, MAX_CENTIMOS,
-  ipValida, urlDe, leerRespuesta, idDeOperacion, estadoDeOperacion, cobradoEntero, centimosValidos,
-  operar, probar, empezarCobro, comoVa, cancelar,
+  RUTAS, VENTA, PAGO, CANCELAR, MAX_CENTIMOS,
+  ipValida, urlDe, leerRespuesta, idDeOperacion, estadoDeOperacion, cobradoEntero, pagadoEntero, centimosValidos,
+  operar, probar, empezarCobro, empezarPago, comoVa, cancelar,
 };

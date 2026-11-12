@@ -24,6 +24,8 @@ if (esComandi) {
     cashdro: {
       lista: () => ipcRenderer.invoke('comandi:cashdro-lista'),
       cobrar: (centimos) => ipcRenderer.invoke('comandi:cashdro-cobrar', Number(centimos) || 0),
+      // Soltar dinero (12/11/2026): el cambio de un repartidor. Desde la 0.6.0.
+      pagar: (centimos) => ipcRenderer.invoke('comandi:cashdro-pagar', Number(centimos) || 0),
       estado: (operacion) => ipcRenderer.invoke('comandi:cashdro-estado', String(operacion || '')),
       cancelar: (operacion) => ipcRenderer.invoke('comandi:cashdro-cancelar', String(operacion || '')),
       soltar: (operacion) => ipcRenderer.send('comandi:cashdro-soltar', String(operacion || '')),

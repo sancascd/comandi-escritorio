@@ -125,3 +125,23 @@ test('los ajustes: lista solo con IP, usuario, contraseña y probada', () => {
 test('nunca se reinicia para actualizarse a mitad de un cobro', () => {
   assert.equal(r.esMomentoTranquilo({ ahora: 1e9, ultimaImpresion: null, quietoSeg: 999, cobrando: true }), false);
 });
+
+// 12/11/2026: soltar dinero (el cambio del repartidor), como las devoluciones de Odoo.
+test('soltar 27,60 €: operación tipo 3 con el importe; acaba cuando la máquina lo ha dado', async () => {
+  const m = maquina({ pasos: [
+    { state: 'E', totalin: 0, totalout: 1000 },
+    { state: 'F', totalin: 0, totalout: 2760 },
+  ] });
+  const e = await c.empezarPago(m.peticion, CFG, 2760);
+  assert.deepEqual(e, { ok: true, operacion: '777', error: null });
+  const inicio = m.vistas.find((u) => u.searchParams.get('operation') === 'startOperation');
+  assert.equal(inicio.searchParams.get('type'), '3', 'un pago (soltar dinero)');
+  assert.deepEqual(JSON.parse(inicio.searchParams.get('parameters')), { amount: '2760' });
+  const a = await c.comoVa(m.peticion, CFG, '777');
+  assert.equal(c.pagadoEntero(a, 2760), false);
+  const b = await c.comoVa(m.peticion, CFG, '777');
+  assert.equal(c.pagadoEntero(b, 2760), true);
+  assert.equal((await c.empezarPago(m.peticion, CFG, 0)).ok, false);
+  const M = require('fs').readFileSync(require('path').join(__dirname, '..', 'src', 'main.js'), 'utf8');
+  assert.match(M, /ipcMain\.handle\('comandi:cashdro-pagar'/);
+});

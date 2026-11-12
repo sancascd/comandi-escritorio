@@ -404,6 +404,24 @@ ipcMain.handle('comandi:cashdro-cobrar', async (evento, centimos) => {
     return r;
   } catch (e) { return errorDe(e); }
 });
+// Soltar dinero (12/11/2026): el cambio que se lleva un repartidor. Igual que
+// cobrar: una operación a la vez, y no se reinicia a mitad.
+ipcMain.handle('comandi:cashdro-pagar', async (evento, centimos) => {
+  if (!desdeComandi(evento)) return { ok: false, error: 'No permitido' };
+  if (!reglas.cashdroLista(leerAjustes())) return { ok: false, error: 'La CashDro no está configurada en este ordenador' };
+  try {
+    const cfg = cfgCashdro();
+    if (cobroEnCurso) {
+      const antes = await cashdro.comoVa(peticionCobro(cfg), cfg, cobroEnCurso).catch(() => null);
+      if (antes && antes.ok && antes.terminada) cobroEnCurso = null;
+      else return { ok: false, error: 'Ya hay una operación en marcha en la CashDro: acábala o cancélala en la máquina' };
+    }
+    const r = await cashdro.empezarPago(peticionCobro(cfg), cfg, centimos);
+    if (r.ok) cobroEnCurso = r.operacion;
+    registrar('la CashDro suelta ' + (Number(centimos) / 100).toFixed(2) + ' €', r);
+    return r;
+  } catch (e) { return errorDe(e); }
+});
 ipcMain.handle('comandi:cashdro-estado', async (evento, operacion) => {
   if (!desdeComandi(evento)) return { ok: false, error: 'No permitido' };
   try {
